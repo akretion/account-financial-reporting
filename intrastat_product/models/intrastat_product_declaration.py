@@ -106,6 +106,10 @@ class IntrastatProductDeclaration(models.Model):
         'res.company', string='Company', readonly=True,
         default=lambda self: self.env['res.company']._company_default_get(
             'intrastat.product.declaration'))
+    company_country_code = fields.Char(
+        compute='_compute_company_country_code',
+        string='Company Country Code', readonly=True, store=True,
+        help="Used in views and methods of localization modules.")
     year = fields.Integer(
         string='Year', required=True,
         default=_get_year)
@@ -192,6 +196,13 @@ class IntrastatProductDeclaration(models.Model):
          "\nYou should update the existing declaration "
          "or change the revision number of this one."),
     ]
+
+    @api.one
+    @api.depends('company_id')
+    def _compute_company_country_code(self):
+        if self.company_id:
+            self.company_country_code = \
+                self.company_id.country_id.code.lower()
 
     @api.one
     @api.depends('year', 'month')
@@ -344,7 +355,7 @@ class IntrastatProductDeclaration(models.Model):
 
     def _get_incoterm(self, inv_line):
         incoterm = inv_line.invoice_id.incoterm_id \
-            or self.company_id.incoterm_id
+            or self.company_id.intrastat_incoterm_id
         if not incoterm:
                 msg = _(
                     "The default Incoterm "
@@ -414,10 +425,8 @@ class IntrastatProductDeclaration(models.Model):
                 # extended declaration
                 if self._extended:
                     transport = self._get_transport(inv_line)
-                    incoterm = self._get_incoterm(inv_line)
                     line_vals.update({
                         'transport_id': transport.id,
-                        'incoterm_id': incoterm.id,
                         })
 
                 self._update_computation_line_vals(inv_line, line_vals)
@@ -479,7 +488,7 @@ class IntrastatProductDeclaration(models.Model):
     def group_line_hashcode(self, computation_line):
         hashcode = "%s-%s-%s-%s-%s" % (
             computation_line.src_dest_country_id.id or False,
-            computation_line.hs_code or False,
+            computation_line.hs_code_id.id or False,
             computation_line.intrastat_unit_id.id or False,
             computation_line.transaction_id.id or False,
             computation_line.transport_id.id or False
@@ -501,12 +510,21 @@ class IntrastatProductDeclaration(models.Model):
                 dl_group[hashcode].append(cl)
             else:
                 dl_group[hashcode] = [cl]
-        ipdlo = self.pool['intrastat.product.declaration.line']
+        ipdl = self.declaration_line_ids
         for cl_lines in dl_group.values():
-            vals = ipdlo._prepare_declaration_line(cl_lines)
-            declaration_line = ipdlo.create(vals)
-            cl_lines.write({'declaration_line_id': declaration_line.id})
+            vals = ipdl._prepare_declaration_line(cl_lines)
+            declaration_line = ipdl.create(vals)
+            for cl in cl_lines:
+                cl.write({'declaration_line_id': declaration_line.id})
         return True
+
+    @api.multi
+    def done(self):
+        self.write({'state': 'done'})
+
+    @api.multi
+    def back2draft(self):
+        self.write({'state': 'draft'})
 
 
 class IntrastatProductComputationLine(models.Model):
@@ -572,6 +590,8 @@ class IntrastatProductComputationLine(models.Model):
         'intrastat.transaction',
         string='Intrastat Transaction')
     # extended declaration
+    incoterm_id = fields.Many2one(
+        'stock.incoterms', string='Incoterm')
     transport_id = fields.Many2one(
         'intrastat.transport_mode',
         string='Transport Mode')
@@ -646,16 +666,19 @@ class IntrastatProductDeclarationLine(models.Model):
         'intrastat.transaction',
         string='Intrastat Transaction')
     # extended declaration
+    # extended declaration
+    incoterm_id = fields.Many2one(
+        'stock.incoterms', string='Incoterm')
     transport_id = fields.Many2one(
         'intrastat.transport_mode',
         string='Transport Mode')
 
     @api.model
-    def _prepare_grouped_fields(computation_line, fields_to_sum):
+    def _prepare_grouped_fields(self, computation_line, fields_to_sum):
         vals = {
             'src_dest_country_id': computation_line.src_dest_country_id.id,
             'intrastat_unit_id': computation_line.intrastat_unit_id.id,
-            'hs_code': computation_line.hs_code_id.local_code,
+            'hs_code_id': computation_line.hs_code_id.id,
             'transaction_id': computation_line.transaction_id.id,
             'transport_id': computation_line.transport_id.id,
             'parent_id': computation_line.parent_id.id,
@@ -664,7 +687,7 @@ class IntrastatProductDeclarationLine(models.Model):
             vals[field] = 0.0
         return vals
 
-    def _fields_to_sum():
+    def _fields_to_sum(self):
         fields_to_sum = [
             'weight',
             'suppl_unit_qty',

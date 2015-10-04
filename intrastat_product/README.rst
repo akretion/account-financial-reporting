@@ -55,11 +55,12 @@ and adapt the code for the specific needs of your country.
 
 * Computation & Declaration Lines
 
-  Create objects inheriting (_inherit = ) from the Computation and Declaration Line Objects
+  Create also new objects inheriting from the Computation and Declaration Line Objects
   so that you can add methods or customise the methods from the base modules (make a PR when
   the customization or new method is required for multiple countries).
-
-  When adding new fields: prefix them with your country coce (cc_newfield).
+  
+  Adapt also the parent_id fields of the newly created objects
+  (cf. l10n_be_intrastat_product as example).
 
 * XML Files: Menu, Action, Views
 

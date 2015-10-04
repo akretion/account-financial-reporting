@@ -28,6 +28,12 @@ from openerp import models, fields, api
 class ResCompany(models.Model):
     _inherit = 'res.company'
 
+    intrastat_incoterm_id = fields.Many2one(
+        'stock.incoterms',
+        string='Default incoterm for Intrastat',
+        help="International Commercial Terms are a series of "
+             "predefined commercial terms used in international "
+             "transactions.")
     intrastat_arrivals = fields.Selection(
         '_intrastat_arrivals', string='Arrivals',
         default='extended', required=True)
