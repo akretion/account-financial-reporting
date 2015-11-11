@@ -293,41 +293,40 @@ class IntrastatProductDeclaration(models.Model):
                 self._note += note
                 return weight, suppl_unit_qty
 
-        if True:
-            if source_uom == kg_uom:
-                weight = line_qty
-            elif source_uom.category_id == weight_uom_categ:
-                weight = self.env['product.uom']._compute_qty_obj(
-                    source_uom, line_qty, kg_uom)
-            elif source_uom.category_id == pce_uom_categ:
-                if not product.weight_net:
-                    note = "\n" + _(
-                        "Missing net weight on product '%s'."
-                        ) % product.name
-                    note += "\n" + _(
-                        "Please correct the product record and regenerate "
-                        "the lines or adjust the impacted lines manually")
-                    self._note += note
-                    return weight, suppl_unit_qty
-                if source_uom == pce_uom:
-                    weight = product.weight_net * line_qty
-                else:
-                    # Here, I suppose that, on the product, the
-                    # weight is per PCE and not per uom_id
-                    weight = product.weight_net * \
-                        self.env['product.uom']._compute_qty_obj(
-                            source_uom, line_qty, pce_uom)
-            else:
+        if source_uom == kg_uom:
+            weight = line_qty
+        elif source_uom.category_id == weight_uom_categ:
+            weight = self.env['product.uom']._compute_qty_obj(
+                source_uom, line_qty, kg_uom)
+        elif source_uom.category_id == pce_uom_categ:
+            if not product.weight_net and not intrastat_unit_id:
                 note = "\n" + _(
-                    "Conversion from unit of measure '%s' to 'Kg' "
-                    "is not implemented yet."
-                    ) % source_uom.name
+                    "Missing net weight on product '%s'."
+                    ) % product.name
                 note += "\n" + _(
-                    "Please correct the unit of measure settings and "
-                    "regenerate the lines or adjust the impacted lines "
-                    "manually")
+                    "Please correct the product record and regenerate "
+                    "the lines or adjust the impacted lines manually")
                 self._note += note
                 return weight, suppl_unit_qty
+            if source_uom == pce_uom:
+                weight = product.weight_net * line_qty
+            else:
+                # Here, I suppose that, on the product, the
+                # weight is per PCE and not per uom_id
+                weight = product.weight_net * \
+                    self.env['product.uom']._compute_qty_obj(
+                        source_uom, line_qty, pce_uom)
+        else:
+            note = "\n" + _(
+                "Conversion from unit of measure '%s' to 'Kg' "
+                "is not implemented yet."
+                ) % source_uom.name
+            note += "\n" + _(
+                "Please correct the unit of measure settings and "
+                "regenerate the lines or adjust the impacted lines "
+                "manually")
+            self._note += note
+            return weight, suppl_unit_qty
 
         return weight, suppl_unit_qty
 
@@ -366,16 +365,13 @@ class IntrastatProductDeclaration(models.Model):
         elif inv_line.invoice_id.type in ('out_invoice', 'out_refund'):
             so_lines = self.env['sale.order.line'].search(
                 [('invoice_lines', 'in', inv_line.id)])
-            print "so_lines=", so_lines
             if so_lines:
                 so = so_lines.order_id
                 region = so.warehouse_id.region_id
         if not region:
             if self.company_id.intrastat_region_id:
                 region = self.company_id.intrastat_region_id
-        print "region=", region
         return region
-
 
     def _get_transport(self, inv_line):
         transport = inv_line.invoice_id.intrastat_transport_id \
@@ -460,10 +456,8 @@ class IntrastatProductDeclaration(models.Model):
                 # extended declaration
                 if self._extended:
                     transport = self._get_transport(inv_line)
-                    region = self._get_region(inv_line)
                     line_vals.update({
                         'transport_id': transport.id,
-                        'region_id': region and region.id or False,
                         })
 
                 self._update_computation_line_vals(inv_line, line_vals)
@@ -494,8 +488,6 @@ class IntrastatProductDeclaration(models.Model):
 
         self.computation_line_ids.unlink()
         self.declaration_line_ids.unlink()
-        # Shouldn't we delete the "notes" field
-        # when we click on "generate lines from invoices ?
         lines = self._gather_invoices()
 
         if not lines:
@@ -526,16 +518,22 @@ class IntrastatProductDeclaration(models.Model):
         return True
 
     @api.model
+    def _group_line_hashcode_fields(self, computation_line):
+        return {
+            'country': computation_line.src_dest_country_id.id or False,
+            'hs_code_id': computation_line.hs_code_id.id or False,
+            'intrastat_unit': computation_line.intrastat_unit_id.id or False,
+            'transaction': computation_line.transaction_id.id or False,
+            'transport': computation_line.transport_id.id or False,
+            'region': computation_line.region_id.id or False,
+            'product_origin_country':
+                computation_line.product_origin_country_id.id or False,
+            }
+
+    @api.model
     def group_line_hashcode(self, computation_line):
-        hashcode = "%s-%s-%s-%s-%s-%s-%s" % (
-            computation_line.src_dest_country_id.id or False,
-            computation_line.hs_code_id.id or False,
-            computation_line.intrastat_unit_id.id or False,
-            computation_line.transaction_id.id or False,
-            computation_line.transport_id.id or False,
-            computation_line.region_id.id or False,
-            computation_line.product_origin_country_id.id or False
-            )
+        flds = self._group_line_hashcode_fields(computation_line)
+        hashcode = '-'.join(['%s' % flds[f] for f in flds])
         return hashcode
 
     @api.multi
