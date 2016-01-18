@@ -2,8 +2,8 @@
 ##############################################################################
 #
 #    Intrastat Product module for Odoo
-#    Copyright (C) 2011-2015 Akretion (http://www.akretion.com)
-#    Copyright (C) 2009-2015 Noviat (http://www.noviat.com)
+#    Copyright (C) 2011-2016 Akretion (http://www.akretion.com)
+#    Copyright (C) 2009-2016 Noviat (http://www.noviat.com)
 #    @author Alexis de Lattre <alexis.delattre@akretion.com>
 #    @author Luc de Meyer <info@noviat.com>
 #
@@ -252,6 +252,8 @@ class IntrastatProductDeclaration(models.Model):
                 return company.intrastat_transaction_out_refund
             elif invoice.type == 'in_invoice':
                 return company.intrastat_transaction_in_invoice
+            elif invoice.type == 'in_refund':
+                return company.intrastat_transaction_in_refund
 
     def _get_weight_and_supplunits(self, inv_line, hs_code):
         line_qty = inv_line.quantity
@@ -269,7 +271,7 @@ class IntrastatProductDeclaration(models.Model):
             note = "\n" + _(
                 "Missing unit of measure on the line with %d "
                 "product(s) '%s' on invoice '%s'."
-                ) % (line_qty, product.name, invoice.number)
+                ) % (line_qty, product.name_get()[0][1], invoice.number)
             note += "\n" + _(
                 "Please adjust this line manually.")
             self._note += note
@@ -330,8 +332,8 @@ class IntrastatProductDeclaration(models.Model):
         else:
             note = "\n" + _(
                 "Conversion from unit of measure '%s' to 'Kg' "
-                "is not implemented yet."
-                ) % source_uom.name
+                "is not implemented yet. It is needed for product '%s'."
+                ) % (source_uom.name, product.name_get()[0][1])
             note += "\n" + _(
                 "Please correct the unit of measure settings and "
                 "regenerate the lines or adjust the impacted lines "
@@ -409,7 +411,29 @@ class IntrastatProductDeclaration(models.Model):
         """ placeholder for localization modules """
         pass
 
+    def _handle_invoice_accessory_cost(
+            self, invoice, lines_current_invoice,
+            total_inv_accessory_costs_cc, total_inv_product_cc):
+        """
+        Affect accessory costs pro-rata of the value.
+
+        This method allows to implement a different logic
+        in the localization modules.
+        E.g. in Belgium accessory cost should not be added.
+        """
+        if total_inv_accessory_costs_cc and total_inv_product_cc:
+            for ac_line_vals in lines_current_invoice:
+                ac_line_vals['amount_accessory_cost_company_currency'] = (
+                    total_inv_accessory_costs_cc *
+                    ac_line_vals['amount_company_currency'] /
+                    total_inv_product_cc)
+
     def _prepare_invoice_domain(self):
+        """
+        Complete this method in the localization module
+        with the country-specific logic for arrivals and dispatches.
+        Cf. l10n_be_intrastat_product_declaration for an example
+        """
         start_date = date(self.year, self.month, 1)
         end_date = start_date + relativedelta(day=1, months=+1, days=-1)
         domain = [
@@ -418,17 +442,18 @@ class IntrastatProductDeclaration(models.Model):
             ('state', 'in', ['open', 'paid']),
             ('intrastat_country', '=', True),
             ('company_id', '=', self.company_id.id)]
-        if self.type == 'arrivals':
-            domain.append(('type', 'in', ('in_invoice', 'in_refund')))
-        elif self.type == 'dispatches':
-            domain.append(('type', 'in', ('out_invoice', 'out_refund')))
         return domain
+
+    def _gather_invoices_init(self):
+        """ placeholder for localization modules """
+        pass
 
     def _gather_invoices(self):
 
         lines = []
         accessory_costs = self.company_id.intrastat_accessory_costs
 
+        self._gather_invoices_init()
         domain = self._prepare_invoice_domain()
         invoices = self.env['account.invoice'].search(domain)
 
@@ -467,8 +492,8 @@ class IntrastatProductDeclaration(models.Model):
                 partner_country = self._get_partner_country(inv_line)
                 if not partner_country:
                     _logger.info(
-                        'Skipping invoice line %s qty %s'
-                        'of invoice %s. Reason: not partner_country'
+                        'Skipping invoice line %s qty %s '
+                        'of invoice %s. Reason: no partner_country'
                         % (inv_line.name, inv_line.quantity, invoice.number))
                     continue
 
@@ -516,6 +541,8 @@ class IntrastatProductDeclaration(models.Model):
                 product_origin_country = self._get_product_origin_country(
                     inv_line)
 
+                region = self._get_region(inv_line)
+
                 line_vals = {
                     'parent_id': self.id,
                     'invoice_line_id': inv_line.id,
@@ -529,28 +556,24 @@ class IntrastatProductDeclaration(models.Model):
                     'transaction_id': intrastat_transaction.id,
                     'product_origin_country_id':
                     product_origin_country.id or False,
+                    'region_id': region and region.id or False,
                     }
 
                 # extended declaration
                 if self._extended:
                     transport = self._get_transport(inv_line)
-                    region = self._get_region(inv_line)
                     line_vals.update({
                         'transport_id': transport.id,
-                        'region_id': region and region.id or False,
                         })
 
                 self._update_computation_line_vals(inv_line, line_vals)
 
-                lines_current_invoice.append((line_vals))
+                if line_vals:
+                    lines_current_invoice.append((line_vals))
 
-            # Affect accessory costs pro-rata of the value
-            if total_inv_accessory_costs_cc and total_inv_product_cc:
-                for ac_line_vals in lines_current_invoice:
-                    ac_line_vals['amount_accessory_cost_company_currency'] = (
-                        total_inv_accessory_costs_cc *
-                        ac_line_vals['amount_company_currency'] /
-                        total_inv_product_cc)
+            self._handle_invoice_accessory_cost(
+                invoice, lines_current_invoice,
+                total_inv_accessory_costs_cc, total_inv_product_cc)
 
             lines += lines_current_invoice
 
@@ -623,8 +646,8 @@ class IntrastatProductDeclaration(models.Model):
             }
 
     def group_line_hashcode(self, computation_line):
-        fields = self._group_line_hashcode_fields(computation_line)
-        hashcode = '-'.join([unicode(f) for f in fields.itervalues()])
+        hc_fields = self._group_line_hashcode_fields(computation_line)
+        hashcode = '-'.join([unicode(f) for f in hc_fields.itervalues()])
         return hashcode
 
     @api.multi

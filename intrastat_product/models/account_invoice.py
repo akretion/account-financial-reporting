@@ -2,8 +2,8 @@
 ##############################################################################
 #
 #    Intrastat Product module for Odoo
-#    Copyright (C) 2011-2015 Akretion (http://www.akretion.com)
-#    Copyright (C) 2009-2015 Noviat (http://www.noviat.com)
+#    Copyright (C) 2011-2016 Akretion (http://www.akretion.com)
+#    Copyright (C) 2009-2016 Noviat (http://www.noviat.com)
 #    @author Alexis de Lattre <alexis.delattre@akretion.com>
 #    @author Luc de Meyer <info@noviat.com>
 #
@@ -34,7 +34,7 @@ class AccountInvoice(models.Model):
              "commercial terms used in international transactions.")
     intrastat_transaction_id = fields.Many2one(
         'intrastat.transaction', string='Intrastat Transaction Type',
-        default=lambda self: self._default_intrastat_transaction(),
+        default=lambda self: self._default_intrastat_transaction_id(),
         ondelete='restrict',
         help="Intrastat nature of transaction")
     intrastat_transport_id = fields.Many2one(
@@ -46,14 +46,42 @@ class AccountInvoice(models.Model):
     intrastat_country = fields.Boolean(
         related='src_dest_country_id.intrastat',
         store=True, string='Intrastat Country', readonly=True)
+    src_dest_region_id = fields.Many2one(
+        'intrastat.region', string='Origin/Destination Region',
+        default=lambda self: self._default_src_dest_region_id(),
+        help="Origin/Destination Region."
+             "\nThis field is used for the Intrastat Declaration.",
+        ondelete='restrict')
     intrastat = fields.Char(
         string='Intrastat Declaration',
-        related='company_id.intrastat', store=True, readonly=True)
+        related='company_id.intrastat', readonly=True)
+    stock_picking_id = fields.Many2one(
+        'stock.picking', string='Stock Picking',
+        help="Contains the picking that is used to create the Invoice.")
 
     @api.model
-    def _default_intrastat_transaction(self):
-        """ placeholder for localisation modules """
-        return self.env['intrastat.transaction'].browse([])
+    def _default_intrastat_transaction_id(self):
+        company = self.env['res.company']
+        company_id = company._company_default_get('account.invoice')
+        company = company.browse(company_id)
+        inv_type = self._context.get('type')
+        if inv_type == 'out_invoice':
+            return company.intrastat_transaction_out_invoice
+        elif inv_type == 'out_refund':
+            return company.intrastat_transaction_out_refund
+        elif inv_type == 'in_invoice':
+            return company.intrastat_transaction_in_invoice
+        elif inv_type == 'in_refund':
+            return company.intrastat_transaction_in_refund
+        else:
+            return self.env['intrastat.transaction']
+
+    @api.model
+    def _default_src_dest_region_id(self):
+        company = self.env['res.company']
+        company_id = company._company_default_get('account.invoice')
+        company = company.browse(company_id)
+        return company.intrastat_region_id
 
     @api.multi
     def onchange_partner_id(

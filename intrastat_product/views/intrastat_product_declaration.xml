@@ -40,7 +40,6 @@
                   <field name="type"/>
                   <field name="action"/>
                   <field name="revision"/>
-                  <field name="reporting_level" invisible="1"/>
                 </group>
               </group>
               <group name="properties-2">
@@ -48,6 +47,7 @@
                 <field name="total_amount" widget="monetary" options="{'currency_field': 'currency_id'}"/>
                 <field name="company_id" groups="base.group_multi_company" widget="selection"/>
                 <field name="company_country_code" invisible="1"/>
+                <field name="reporting_level" invisible="1"/>
                 <field name="currency_id" invisible="1"/>
               </group>
             </group>
@@ -104,8 +104,8 @@
       <field name="model">intrastat.product.declaration</field>
       <field name="arch" type="xml">
         <search string="Search Intrastat Product Declarations">
-          <filter name="arrivals" string="Arrivals" domain="[('type', 'like', 'EX19')]" />
-          <filter name="dispatches" string="Dispatches" domain="[('type', 'like', 'EX29')]" />
+          <filter name="arrivals" string="Arrivals" domain="[('type', '=', 'arrivals')]" />
+          <filter name="dispatches" string="Dispatches" domain="[('type', '=', 'dispatches')]" />
           <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]" />
           <filter name="done" string="Done" domain="[('state', '=', 'done')]" />
           <group string="Group By" name="group_by">
