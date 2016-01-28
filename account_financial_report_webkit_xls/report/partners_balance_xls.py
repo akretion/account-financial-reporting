@@ -166,6 +166,7 @@ class partners_balance_xls(report_xls):
         else:
             account_span = _p.initial_balance_mode and 2 or 3
         c_specs = [
+            ('partner_id', 1, 0, 'text', _('Id Partner')),
             ('account', account_span, 0, 'text', _('Account / Partner Name')),
             ('code', 1, 0, 'text', _('Code / Ref')),
         ]
@@ -356,7 +357,11 @@ class partners_balance_xls(report_xls):
                 else:
                     account_span = _p.initial_balance_mode and 2 or 3
 
-                c_specs = [('acc_title', account_span, 0, 'text',
+                c_specs = [('Partner ID', 1, 0, 'number',
+                            partner_id if partner_id else
+                            0)]
+
+                c_specs += [('acc_title', account_span, 0, 'text',
                             partner_name if partner_name else
                             _('Unallocated'))]
                 c_specs += [('partner_ref', 1, 0, 'text',
