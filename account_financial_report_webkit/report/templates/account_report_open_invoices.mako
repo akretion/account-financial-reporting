@@ -26,6 +26,9 @@
     <% context.lookup.put_template('open_invoices_inclusion.mako.html', template1) %>
     <% template2 = helper.get_mako_template('account_financial_report_webkit','report', 'templates', 'grouped_by_curr_open_invoices_inclusion.mako.html') %>
     <% context.lookup.put_template('grouped_by_curr_open_invoices_inclusion.mako.html', template2) %>
+    <% template3 = helper.get_mako_template('account_financial_report_webkit','report', 'templates', 'open_invoices_inclusion_oskab.mako.html') %>
+    <% context.lookup.put_template('open_invoices_inclusion_oskab.mako.html', template3) %>
+
         <%setLang(user.lang)%>
 
         <div class="act_as_table data_table">
@@ -77,8 +80,13 @@
                <% fl = formatLang %>
               <%include file="grouped_by_curr_open_invoices_inclusion.mako.html" args="account=acc,formatLang=fl"/>
             %else:
-               <% fl = formatLang %>
-              <%include file="open_invoices_inclusion.mako.html" args="account=acc,formatLang=fl"/>
+              %if result_selection == 'all':
+                 <% fl = formatLang %>
+                <%include file="open_invoices_inclusion_oskab.mako.html" args="account=acc,formatLang=fl"/>
+              %else:
+                 <% fl = formatLang %>
+                <%include file="open_invoices_inclusion.mako.html" args="account=acc,formatLang=fl"/>
+              %endif
             %endif
         %endfor
     </body>

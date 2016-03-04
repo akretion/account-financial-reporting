@@ -30,6 +30,12 @@ class AccountReportOpenInvoicesWizard(orm.TransientModel):
     _description = "Open Invoices Report"
 
     _columns = {
+        'result_selection': fields.selection(
+            [('customer', 'Receivable Accounts'),
+             ('supplier', 'Payable Accounts'),
+             ('customer_supplier', 'Receivable and Payable Accounts'),
+             ('all', 'All reconcile accounts')],
+            "Partner's", required=True),
         'group_by_currency': fields.boolean('Group Partner by currency'),
         'until_date': fields.date(
             "Clearance date",

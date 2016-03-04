@@ -128,7 +128,8 @@ class PartnersOpenInvoicesWebkit(report_sxw.rml_parse,
             filter_type = ('receivable',)
         if result_selection == 'supplier':
             filter_type = ('payable',)
-
+        if result_selection == 'all':
+            filter_type = None
         account_ids = self.get_all_accounts(
             new_ids, exclude_type=['view'], only_type=filter_type)
 
@@ -186,9 +187,9 @@ class PartnersOpenInvoicesWebkit(report_sxw.rml_parse,
             'chart_account': chart_account,
             'ledger_lines': ledger_lines,
             'init_balance': init_balance,
-            'partners_order': partners_order
+            'partners_order': partners_order,
+            'result_selection': result_selection
         })
-
         return super(PartnersOpenInvoicesWebkit, self).set_context(
             objects, data, new_ids, report_type=report_type)
 
@@ -231,7 +232,6 @@ class PartnersOpenInvoicesWebkit(report_sxw.rml_parse,
             move_line_ids_per_partner = self.get_partners_move_lines_ids(
                 account_id, main_filter, start, stop, target_move,
                 exclude_reconcile=True, partner_filter=partner_filter)
-
             if not initial_move_lines_ids_per_partner \
                     and not move_line_ids_per_partner:
                 continue
