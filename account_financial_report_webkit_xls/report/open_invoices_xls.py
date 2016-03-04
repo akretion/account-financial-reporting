@@ -651,6 +651,66 @@ class open_invoices_xls(report_xls):
             self.ws, row_position, row_data, self.style_account_title)
         return row_position + 1
 
+    def print_oskab_cumul_account(self, row_position, row_start_account, account, _p,
+                            data):
+
+        # This procedure will create  an Excel sumif function that will check
+        # in the column "label" for the "Cumulated Balance.." string and make a
+        # sum of the debit & credit data
+        # the text "Cumulated Balance on Partner starts in column 4 when
+        # selecting the option regroup by currency, 5 in  the other case
+        start_col = 5
+
+        debit_account_start = rowcol_to_cell(row_start_account, start_col + 3)
+        debit_account_end = rowcol_to_cell(row_position - 1, start_col + 3)
+        debit_account_total = 'SUM(' + debit_account_start + \
+            ':' + debit_account_end + ')'
+
+        credit_account_start = rowcol_to_cell(row_start_account, start_col + 4)
+        credit_account_end = rowcol_to_cell(row_position - 1, start_col + 4)
+        credit_account_total = 'SUM(' + credit_account_start + \
+            ':' + credit_account_end + ')'
+
+        bal_curr_start = rowcol_to_cell(row_start_account, start_col + 6)
+        bal_curr_end = rowcol_to_cell(row_position - 1, start_col + 6)
+        cumul_balance_curr = 'SUM(' + bal_curr_start + ':' + bal_curr_end + ')'
+
+        bal_account_debit = rowcol_to_cell(row_position, start_col + 3)
+        bal_account_credit = rowcol_to_cell(row_position, start_col + 4)
+        bal_account_total = bal_account_debit + '-' + bal_account_credit
+
+        c_specs = [
+            ('acc_title', start_col, 0, 'text',
+             ' - '.join([account.code, account.name])),
+            ('init_bal', 2, 0, 'text',
+             _('Cumulated Balance on Account')),
+            ('empty2', 1, 0, 'text', None),
+            ('debit', 1, 0, 'number', None,
+             debit_account_total, self.style_account_title_decimal),
+            ('credit', 1, 0, 'number', None,
+             credit_account_total, self.style_account_title_decimal),
+            ('balance', 1, 0, 'number', None,
+             bal_account_total, self.style_account_title_decimal),
+        ]
+        if _p.amount_currency(data):
+            if account.currency_id:
+                c_specs += [('cumul_bal_curr', 1, 0, 'number', None,
+                             cumul_balance_curr),
+                            ('curr_name', 1, 0, 'text',
+                             account.currency_id.name,
+                             None, self.style_account_title_right),
+                            ]
+            else:
+                c_specs += [('cumul_bal_curr', 1, 0, 'text', "-", None,
+                             self.style_account_title_right),
+                            ('curr_name', 1, 0, 'text', "",
+                             None, self.style_account_title_right)
+                            ]
+        row_data = self.xls_row_template(c_specs, [x[0] for x in c_specs])
+        row_position = self.xls_write_row(
+            self.ws, row_position, row_data, self.style_account_title)
+        return row_position + 1
+
     # print by account the totals of the credit and debit + balance calculation
     def print_group_cumul_account(self, row_position, row_start_account,
                                   account):
@@ -769,6 +829,7 @@ class open_invoices_xls(report_xls):
             # Print account line: code - account
             row_pos = self.print_row_code_account(
                 "noregroup", account, row_pos, "")
+
             for partner_name, p_id, p_ref, p_name \
                     in _p['partners_order'][account.id]:
 
@@ -793,6 +854,37 @@ class open_invoices_xls(report_xls):
 
         return row_pos
 
+    def print_oskab_ledger_lines(self, row_pos, account, _xs, xlwt, _p, data):
+
+        if _p['ledger_lines'][account.id] \
+           and _p['partners_order'][account.id]:
+
+            row_start_account = row_pos
+
+            # Print account line: code - account
+            row_pos = self.print_row_code_account(
+                "noregroup", account, row_pos, "")
+            # Print row: Titles "Date-Period-Entry-Journal..."
+            row_pos = self.print_columns_title(
+                _p, row_pos, data, group_lines=False)
+
+            for partner_name, p_id, p_ref, p_name \
+                    in _p['partners_order'][account.id]:
+
+
+                row_pos_start = row_pos
+                line_number = 0
+                for line in _p['ledger_lines'][account.id].get(p_id, []):
+                    line_number += 1
+                    # print ledger lines
+                    row_pos = self.print_lines(
+                        row_pos, account, line, _p, data, line_number)
+
+            row_pos = self.print_oskab_cumul_account(
+                row_pos, row_start_account, account, _p, data)
+
+        return row_pos
+
     def generate_xls_report(self, _p, _xs, data, objects, wb):  # main function
 
         # Initializations
@@ -811,6 +903,8 @@ class open_invoices_xls(report_xls):
         self.ws.set_horz_split_pos(row_pos)
         # Print empty row
         row_pos = self.print_empty_row(row_pos)
+        wizard = self.pool[self.context['active_model']].read(
+            self.cr, self.uid, self.context['active_id'], ['result_selection'])
 
         for acc in objects:
             if hasattr(acc, 'grouped_ledger_lines'):
@@ -819,9 +913,14 @@ class open_invoices_xls(report_xls):
                 row_pos = self.print_grouped_line_report(
                     row_pos, acc, _xs, xlwt, _p, data)
             else:
-                # call xls equivalent of "open_invoices_inclusion.mako.html"
-                row_pos = self.print_ledger_lines(
-                    row_pos, acc, _xs, xlwt, _p, data)
+                if wizard['result_selection'] == 'all':
+                    # call xls equivalent of "open_invoices_inclusion_oskab.mako.html"
+                    row_pos = self.print_oskab_ledger_lines(
+                        row_pos, acc, _xs, xlwt, _p, data)
+                else:
+                    # call xls equivalent of "open_invoices_inclusion.mako.html"
+                    row_pos = self.print_ledger_lines(
+                        row_pos, acc, _xs, xlwt, _p, data)
             row_pos += 1
 
 open_invoices_xls('report.account.account_report_open_invoices_xls',
