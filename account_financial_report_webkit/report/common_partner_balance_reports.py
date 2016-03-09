@@ -36,7 +36,8 @@ class CommonPartnerBalanceReportHeaderWebkit(CommonBalanceReportHeaderWebkit,
     def _get_account_partners_details(self, account_by_ids, main_filter,
                                       target_move, start, stop,
                                       initial_balance_mode,
-                                      partner_filter_ids=False):
+                                      partner_filter_ids=False,
+                                      exclude_null_balance=False):
         res = {}
         filter_from = False
         if main_filter in ('filter_period', 'filter_no', 'filter_opening'):
@@ -81,10 +82,12 @@ class CommonPartnerBalanceReportHeaderWebkit(CommonBalanceReportHeaderWebkit,
                     get('init_balance', 0.0) + \
                     details[partner_id].get('debit', 0.0) - \
                     details[partner_id].get('credit', 0.0)
-                if not round(details[partner_id]['balance'], 4):
+                if exclude_null_balance and not \
+                        round(details[partner_id]['balance'], 4):
                     partner_to_remove.append(partner_id)
-            for p_id in partner_to_remove:
-                del details[p_id]
+            if partner_to_remove:
+                for p_id in partner_to_remove:
+                    del details[p_id]
             res[account_id] = details
 
         return res
@@ -203,10 +206,12 @@ class CommonPartnerBalanceReportHeaderWebkit(CommonBalanceReportHeaderWebkit,
                 account_ids, target_move, fiscalyear, details_filter, start,
                 stop, initial_balance_mode)
 
+            exclude_null_balance = data['form']['exclude_null_balance']
             partner_details_by_ids = self._get_account_partners_details(
                 accounts_by_ids, details_filter,
                 target_move, start, stop, initial_balance_mode,
-                partner_filter_ids=partner_filter_ids)
+                partner_filter_ids=partner_filter_ids,
+                exclude_null_balance=exclude_null_balance)
 
             for account_id in account_ids:
                 accounts_details_by_ids[account_id][
@@ -265,10 +270,11 @@ class CommonPartnerBalanceReportHeaderWebkit(CommonBalanceReportHeaderWebkit,
         accounts_by_ids = self._get_account_details(
             account_ids, target_move, fiscalyear, main_filter, start, stop,
             initial_balance_mode)
-
+        exclude_null_balance = data['form']['exclude_null_balance']
         partner_details_by_ids = self._get_account_partners_details(
             accounts_by_ids, main_filter, target_move, start, stop,
-            initial_balance_mode, partner_filter_ids=partner_ids)
+            initial_balance_mode, partner_filter_ids=partner_ids,
+            exclude_null_balance=exclude_null_balance)
 
         comparison_params = []
         comp_accounts_by_ids = []
