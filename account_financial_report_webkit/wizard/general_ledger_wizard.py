@@ -54,7 +54,12 @@ class AccountReportGeneralLedgerWizard(orm.TransientModel):
                     print all accounts."""),
         'centralize': fields.boolean(
             'Activate Centralization',
-            help='Uncheck to display all the details of centralized accounts.')
+            help='Uncheck to display all the details of centralized accounts.'),
+        'target_move': fields.selection([('posted', 'All Posted Entries'),
+                                         ('all', 'All Entries'),
+                                         ('all_unreconcile', 'All Unreconcile Entries'),
+                                         ('posted_unreconcile', 'All Unreconcile Posted Entries')
+                                        ], 'Target Moves', required=True),
     }
     _defaults = {
         'amount_currency': False,

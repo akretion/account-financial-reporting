@@ -450,8 +450,15 @@ class CommonReportHeaderWebkit(common_report_header):
             return []
         search = [
             ('period_id', 'in', periods), ('account_id', '=', account_id)]
-        if target_move == 'posted':
+        if target_move in ['posted', 'posted_unreconcile']:
             search += [('move_id.state', '=', 'posted')]
+        if target_move in ['all_unreconcile', 'posted_unreconcile']:
+            search += [
+                '|',
+                ('reconcile_id', '=', False),
+                '&',
+                ('reconcile_id.reconcile_min_date', '>=', period_start.date_start),
+                ('reconcile_id.reconcile_max_date', '<=', period_stop.date_stop)]
         return move_line_obj.search(self.cursor, self.uid, search)
 
     def _get_move_ids_from_dates(self, account_id, date_start, date_stop,
@@ -469,9 +476,15 @@ class CommonReportHeaderWebkit(common_report_header):
             if opening:
                 search_period += ['period_id', 'not in', opening]
 
-        if target_move == 'posted':
+        if target_move in ('posted', 'posted_unreconcile'):
             search_period += [('move_id.state', '=', 'posted')]
-
+        if target_move in ['all_unreconcile', 'posted_unreconcile']:
+            search_period += [
+                '|',
+                ('reconcile_id', '=', False),
+                '&',
+                ('reconcile_id.reconcile_min_date', '>=', date_start),
+                ('reconcile_id.reconcile_max_date', '<=', date_stop)]
         return move_line_obj.search(self.cursor, self.uid, search_period)
 
     def get_move_lines_ids(self, account_id, main_filter, start, stop,
