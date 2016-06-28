@@ -65,9 +65,6 @@
         <record id="base.cz" model="res.country">
             <field name="intrastat" eval="True"/>
         </record>
-        <record id="base.uk" model="res.country">
-            <field name="intrastat" eval="True"/>
-        </record>
         <record id="base.si" model="res.country">
             <field name="intrastat" eval="True"/>
         </record>
