@@ -1,31 +1,17 @@
 # -*- coding: utf-8 -*-
-##############################################################################
-#
-#    Author Joel Grand-Guillaume and Vincent Renaville
-#    Copyright 2013 Camptocamp SA
-#
-#    This program is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU Affero General Public License as
-#    published by the Free Software Foundation, either version 3 of the
-#    License, or (at your option) any later version.
-#
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU Affero General Public License for more details.
-#
-#    You should have received a copy of the GNU Affero General Public License
-#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-##############################################################################
+# © 2013 Camptocamp SA
+#   @author Joel Grand-Guillaume and Vincent Renaville
+# © 2016-Today Akretion (http://www.akretion.com)
+#   @author Mourad EL HADJ MIMOUNE <mourad.elhadj.mimoune@akretion.com>
+# License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
 {
     'name': 'Account Export CSV',
-    'version': '8.0.1.1.0',
+    'version': '9.0.1.0.0',
     'depends': [
         'account',
     ],
-    'author': "Camptocamp,Odoo Community Association (OCA)",
+    'author': "Camptocamp, Akretion, Odoo Community Association (OCA)",
     'description': """
 
     Add a wizard that allow you to export a csv file based on accounting
@@ -44,7 +30,7 @@
     'license': 'AGPL-3',
     'data': [
         'wizard/account_export_csv_view.xml',
-        'menu.xml',
+        'views/menu.xml',
     ],
     'installable': False,
     'active': False,
