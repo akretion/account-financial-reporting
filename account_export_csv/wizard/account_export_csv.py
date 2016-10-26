@@ -11,11 +11,12 @@ import itertools
 import tempfile
 from cStringIO import StringIO
 import base64
+from datetime import date
 
 import csv
 import codecs
 
-from openerp import models, fields
+from openerp import api, fields, models
 from openerp.tools.translate import _
 
 
@@ -63,55 +64,51 @@ class AccountCSVExport(models.TransientModel):
     _name = 'account.csv.export'
     _description = 'Export Accounting'
 
-    data = fields.binary('CSV', readonly=True)
+    def _get_company_default(self):
+        return self.env.user.company_id.id
+
+    def _get_date_from_default(self):
+        date_from = self.env.user.company_id.\
+            compute_fiscalyear_dates(date.today())['date_from']
+        return date_from
+
+    data = fields.Binary('CSV', readonly=True)
     company_id = fields.Many2one(
-        'res.company', 'Company', invisible=True)
-    fiscalyear_id = fields.Many2one('account.fiscalyear', 'Fiscalyear',
-                                    required=True)
-    periods = fields.Many2one(
-        'account.period', 'rel_wizard_period',
-        'wizard_id', 'period_id', 'Periods',
-        help='All periods in the fiscal year if empty')
-    journal_ids = fields.Many2one(
+        'res.company', 'Company', default=_get_company_default, invisible=True)
+    date_from = fields.Date(
+        'Star Date',
+        default=_get_date_from_default,
+        help='Date of the beging of the fiscal year if empty')
+    date_to = fields.Date(
+        'End Date',
+        default=fields.Date.context_today,
+        help='Date of the end of the fiscal year if empty')
+    journal_ids = fields.Many2many(
         'account.journal',
         'rel_wizard_journal',
         'wizard_id',
         'journal_id',
         'Journals',
         help='If empty, use all journals, only used for journal entries')
-    account_ids = fields.Many2one(
+    account_ids = fields.Many2many(
         'account.account',
         'rel_wizard_account',
         'wizard_id',
         'account_id',
         'Accounts',
         help='If empty, use all accounts, only used for journal entries')
-    export_filename = fields.Char('Export CSV Filename', size=128)
+    export_filename = fields.Char(
+        'Export CSV Filename', default='account_export.csv', size=128)
 
-    def _get_company_default(self):
-        comp_obj = self.pool['res.company']
-        return comp_obj._company_default_get('account.fiscalyear')
-
-    def _get_fiscalyear_default(self):
-        fiscalyear_obj = self.pool['account.fiscalyear']
-        context = dict(context,
-                       company_id=self._get_company_default(context))
-        return fiscalyear_obj.find(dt=None, exception=True)
-
-    _defaults = {'company_id': _get_company_default,
-                 'fiscalyear_id': _get_fiscalyear_default,
-                 'export_filename': 'account_export.csv'}
-
-    def action_manual_export_account(self, ids):
-        this = self.browse(ids)[0]
-        rows = self.get_data(ids, "account")
+    @api.multi
+    def action_manual_export_account(self,):
+        rows = self.get_data("account")
         file_data = StringIO()
         try:
             writer = AccountUnicodeWriter(file_data)
             writer.writerows(rows)
             file_value = file_data.getvalue()
-            self.write(ids,
-                       {'data': base64.encodestring(file_value)})
+            self.data = base64.encodestring(file_value)
         finally:
             file_data.close()
         return {
@@ -119,7 +116,7 @@ class AccountCSVExport(models.TransientModel):
             'res_model': 'account.csv.export',
             'view_mode': 'form',
             'view_type': 'form',
-            'res_id': this.id,
+            'res_id': self.id,
             'views': [(False, 'form')],
             'target': 'new',
         }
@@ -133,42 +130,47 @@ class AccountCSVExport(models.TransientModel):
                 ]
 
     def _get_rows_account(
-            self, fiscalyear_id, period_range_ids, journal_ids, account_ids):
+            self, date_from, date_to, journal_ids, account_ids):
         """
         Return list to generate rows of the CSV file
         """
-        cr.execute("""
+        self._cr.execute("""
                 select ac.code,ac.name,
                 sum(debit) as sum_debit,
                 sum(credit) as sum_credit,
                 sum(debit) - sum(credit) as balance
                 from account_move_line as aml,account_account as ac
                 where aml.account_id = ac.id
-                and period_id in %(period_ids)s
+                and aml.date >=  %(date_from)s
+                and aml.date <=  %(date_to)s         
+                and aml.journal_id in %(journal_ids)s
+                and aml.account_id in %(account_ids)s
                 group by ac.id,ac.code,ac.name
                 order by ac.code
                    """,
-                   {'fiscalyear_id': fiscalyear_id,
-                       'period_ids': tuple(period_range_ids)}
+                   {
+                        'date_from': date_from,
+                        'date_to': date_to,
+                        'journal_ids': tuple(journal_ids),
+                        'account_ids': tuple(account_ids),
+                    }
                    )
-        res = cr.fetchall()
+        res = self._cr.fetchall()
 
         rows = []
         for line in res:
             rows.append(list(line))
         return rows
 
+    @api.multi
     def action_manual_export_analytic(self):
-        this = self.browse(ids)[0]
-        rows = self.get_data(ids, "analytic", context)
+        rows = self.get_data("analytic")
         file_data = StringIO()
         try:
             writer = AccountUnicodeWriter(file_data)
             writer.writerows(rows)
             file_value = file_data.getvalue()
-            self.write(ids,
-                       {'data': base64.encodestring(file_value)},
-                       context=context)
+            self.data = base64.encodestring(file_value)
         finally:
             file_data.close()
         return {
@@ -176,7 +178,7 @@ class AccountCSVExport(models.TransientModel):
             'res_model': 'account.csv.export',
             'view_mode': 'form',
             'view_type': 'form',
-            'res_id': this.id,
+            'res_id': self.id,
             'views': [(False, 'form')],
             'target': 'new',
         }
@@ -192,11 +194,11 @@ class AccountCSVExport(models.TransientModel):
                 ]
 
     def _get_rows_analytic(
-            self, fiscalyear_id, period_range_ids, journal_ids, account_ids):
+            self, date_from, date_to, journal_ids, account_ids):
         """
         Return list to generate rows of the CSV file
         """
-        cr.execute("""  select aac.code as analytic_code,
+        self._cr.execute("""  select aac.code as analytic_code,
                         aac.name as analytic_name,
                         ac.code,ac.name,
                         sum(debit) as sum_debit,
@@ -207,20 +209,24 @@ class AccountCSVExport(models.TransientModel):
                         on (account_move_line.analytic_account_id = aac.id)
                         inner join account_account as ac
                         on account_move_line.account_id = ac.id
-                        and account_move_line.period_id in %(period_ids)s
+                        and account_move_line.date >=  %(date_from)s
+                        and account_move_line.date <=  %(date_to)s 
                         group by aac.id,aac.code,aac.name,ac.id,ac.code,ac.name
                         order by aac.code
                    """,
-                   {'fiscalyear_id': fiscalyear_id,
-                       'period_ids': tuple(period_range_ids)}
+                   {
+                        'date_from': date_from,
+                        'date_to': date_to,
+                    }
                    )
-        res = cr.fetchall()
+        res = self._cr.fetchall()
 
         rows = []
         for line in res:
             rows.append(list(line))
         return rows
 
+    @api.multi
     def action_manual_export_journal_entries(self):
         """
         Here we use TemporaryFile to avoid full filling the OpenERP worker
@@ -240,8 +246,7 @@ class AccountCSVExport(models.TransientModel):
 
         Tested with up to a generation of 700k entry lines
         """
-        this = self.browse(ids)[0]
-        rows = self.get_data(ids, "journal_entries", context)
+        rows = self.get_data("journal_entries")
         with tempfile.TemporaryFile() as file_data:
             writer = AccountUnicodeWriter(file_data)
             writer.writerows(rows)
@@ -249,16 +254,16 @@ class AccountCSVExport(models.TransientModel):
                 file_data.seek(0)
                 base64.encode(file_data, base64_data)
                 base64_data.seek(0)
-                cr.execute("""
+                self._cr.execute("""
                 UPDATE account_csv_export
                 SET data = %s
-                WHERE id = %s""", (base64_data.read(), ids[0]))
+                WHERE id = %s""", (base64_data.read(), self.id))
         return {
             'type': 'ir.actions.act_window',
             'res_model': 'account.csv.export',
             'view_mode': 'form',
             'view_type': 'form',
-            'res_id': this.id,
+            'res_id': self.id,
             'views': [(False, 'form')],
             'target': 'new',
         }
@@ -275,7 +280,7 @@ class AccountCSVExport(models.TransientModel):
             _(u'DEBIT'),
             _(u'CREDIT'),
             _(u'FULL RECONCILE'),
-            _(u'PARTIAL RECONCILE'),
+            #_(u'PARTIAL RECONCILE'),
             _(u'ANALYTIC ACCOUNT CODE'),
 
             # Other fields
@@ -296,15 +301,14 @@ class AccountCSVExport(models.TransientModel):
 
     def _get_rows_journal_entries(
             self,
-            ids,
-            fiscalyear_id,
-            period_range_ids,
+            date_from,
+            date_to,
             journal_ids,
             account_ids):
         """
         Create a generator of rows of the CSV file
         """
-        cr.execute("""
+        self._cr.execute("""
         SELECT
           account_move_line.date AS date,
           account_journal.name as journal,
@@ -314,8 +318,8 @@ class AccountCSVExport(models.TransientModel):
           account_move_line.name AS description,
           account_move_line.debit AS debit,
           account_move_line.credit AS credit,
-          account_move_reconcile.name as full_reconcile,
-          account_move_line.reconcile_partial_id AS partial_reconcile_id,
+          account_full_reconcile.name as full_reconcile,
+          -- account_full_reconcile.reconcile_partial_id AS partial_reconcile_id,
           account_analytic_account.code AS analytic_account_code,
           account_move.name AS entry_number,
           account_account.name AS account_name,
@@ -324,89 +328,84 @@ class AccountCSVExport(models.TransientModel):
           res_currency.name AS currency,
           account_analytic_account.name AS analytic_account_name,
           account_journal.name as journal,
-          account_period.code AS month,
-          account_fiscalyear.name as fiscal_year,
-          account_tax_code.code AS aml_tax_code_code,
-          account_tax_code.name AS aml_tax_code_name,
-          account_move_line.tax_amount AS aml_tax_amount,
+          EXTRACT(MONTH FROM account_move_line.date) AS month,
+          EXTRACT(YEAR FROM account_move_line.date) as year,
+          account_tax.description AS aml_tax_code_code,
+          account_tax.name AS aml_tax_code_name,
+          0 AS aml_tax_amount,
           account_bank_statement.name AS bank_statement
         FROM
           public.account_move_line
           JOIN account_account on
             (account_account.id=account_move_line.account_id)
-          JOIN account_period on
-            (account_period.id=account_move_line.period_id)
-          JOIN account_fiscalyear on
-            (account_fiscalyear.id=account_period.fiscalyear_id)
           JOIN account_journal on
             (account_journal.id = account_move_line.journal_id)
           LEFT JOIN res_currency on
             (res_currency.id=account_move_line.currency_id)
-          LEFT JOIN account_move_reconcile on
-            (account_move_reconcile.id = account_move_line.reconcile_id)
+          LEFT JOIN account_full_reconcile on
+            (account_full_reconcile.id = account_move_line.full_reconcile_id )
           LEFT JOIN res_partner on
             (res_partner.id=account_move_line.partner_id)
           LEFT JOIN account_move on
             (account_move.id=account_move_line.move_id)
           LEFT JOIN account_tax on
-            (account_tax.id=account_move_line.account_tax_id)
-          LEFT JOIN account_tax_code on
-            (account_tax_code.id=account_move_line.tax_code_id)
+            (account_tax.id=account_move_line.tax_line_id)
           LEFT JOIN account_analytic_account on
             (account_analytic_account.id=account_move_line.analytic_account_id)
           LEFT JOIN account_bank_statement on
             (account_bank_statement.id=account_move_line.statement_id)
-        WHERE account_period.id IN %(period_ids)s
+        WHERE account_move_line.date >=  %(date_from)s
+        AND account_move_line.date <=  %(date_to)s 
         AND account_journal.id IN %(journal_ids)s
         AND account_account.id IN %(account_ids)s
         ORDER BY account_move_line.date
         """,
-                   {'period_ids': tuple(period_range_ids),
-                    'journal_ids': tuple(journal_ids),
-                    'account_ids': tuple(account_ids)}
+                   {
+                       'date_from': date_from,
+                       'date_to': date_to,
+                       'journal_ids': tuple(journal_ids),
+                       'account_ids': tuple(account_ids)}
                    )
         while 1:
             # http://initd.org/psycopg/docs/cursor.html#cursor.fetchmany
             # Set cursor.arraysize to minimize network round trips
-            cr.arraysize = 100
-            rows = cr.fetchmany()
+            self._cr.arraysize = 100
+            rows = self._cr.fetchmany()
             if not rows:
                 break
             for row in rows:
                 yield row
 
-    def get_data(self, ids, result_type):
+    def get_data(self, result_type):
         get_header_func = getattr(
             self, ("_get_header_%s" % (result_type)), None)
         get_rows_func = getattr(self, ("_get_rows_%s" % (result_type)), None)
-        form = self.browse(ids[0])
-        fiscalyear_id = form.fiscalyear_id.id
-        if form.periods:
-            period_range_ids = [x.id for x in form.periods]
-        else:
-            # If not period selected , we take all periods
-            p_obj = self.pool.get("account.period")
-            period_range_ids = p_obj.search(
-                , [('fiscalyear_id', '=', fiscalyear_id)])
+        date_from = None
+        date_to = None
+        if not self.date_from:
+            date_from = self.env.user.company_id.\
+                compute_fiscalyear_dates(date.today())['date_from']
+        if not self.date_to:
+            date_to = self.env.user.company_id.\
+                compute_fiscalyear_dates(date.today())['date_to']
         journal_ids = None
-        if form.journal_ids:
-            journal_ids = [x.id for x in form.journal_ids]
+        if self.journal_ids:
+            journal_ids = self.journal_ids.ids
         else:
-            j_obj = self.pool.get("account.journal")
-            journal_ids = j_obj.search([])
+            j_obj = self.env["account.journal"]
+            journal_ids = j_obj.search([]).ids
         account_ids = None
-        if form.account_ids:
-            account_ids = [x.id for x in form.account_ids]
+        if self.account_ids:
+            account_ids = self.account_ids.ids
         else:
-            aa_obj = self.pool.get("account.account")
-            account_ids = aa_obj.search([])
-        rows = itertools.chain((get_header_func(ids,
-                                                context=context),),
-                               get_rows_func(
-            fiscalyear_id,
-            period_range_ids,
-            journal_ids,
-            account_ids,
-        )
+            aa_obj = self.env["account.account"]
+            account_ids = aa_obj.search([]).ids
+        rows = itertools.chain(
+            (get_header_func(),), get_rows_func(
+                date_from,
+                date_to,
+                journal_ids,
+                account_ids,
+            )
         )
         return rows

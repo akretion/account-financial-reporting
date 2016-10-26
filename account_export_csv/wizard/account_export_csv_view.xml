@@ -6,13 +6,13 @@
              <field name="name">Accounting Entries CSV Export</field>
              <field name="model">account.csv.export</field>
              <field name="arch" type="xml">
-                <form string="Accounting CSV Export" version="7.0">
+                <form string="Accounting CSV Export">
                     <group colspan="4">
                         <field name="company_id" />
-                        <field name="fiscalyear_id"  domain="[('company_id', '=', company_id)]"/>
                      </group>
                     <group colspan="4" col="2">
-                        <field name="periods" domain="[('fiscalyear_id','=',fiscalyear_id)]"/>
+                        <field name="date_from"/>
+                        <field name="date_to"/>
                         <field name="journal_ids"/>
                         <field name="account_ids"/>
                     </group>
