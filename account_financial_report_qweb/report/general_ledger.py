@@ -280,7 +280,6 @@ class GeneralLedgerReportCompute(models.TransientModel):
                     ON a.id = ml.account_id
                     AND ml.date <= %s
         """
-
         if not include_initial_balance:
             sub_subquery_sum_amounts += """
                 AND at.include_initial_balance != TRUE AND ml.date >= %s
@@ -386,9 +385,14 @@ WITH
             GROUP BY
                 a.id
             """
+        # UGLY HACK FOR testing purpose
+        init_subquery = subquery_sum_amounts.replace(
+            "AND ml.date <= %s", "AND ml.date < %s")
+        # END OF UGLY HACK
+
         query_inject_account += """
         ),
-    initial_sum_amounts AS ( """ + subquery_sum_amounts + """ ),
+    initial_sum_amounts AS ( """ + init_subquery + """ ),
     final_sum_amounts AS ( """ + subquery_sum_amounts + """ )
 INSERT INTO
     report_general_ledger_qweb_account
