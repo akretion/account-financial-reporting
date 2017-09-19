@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: Julien Coux
 # Copyright 2016 Camptocamp SA
+# Copyright 2017 Tecnativa - Luis M. Ontalba
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
 from odoo import models, fields, api
@@ -52,6 +53,13 @@ class TrialBalanceReportWizard(models.TransientModel):
         readonly=True,
         string='Not only one unaffected earnings account'
     )
+
+    @api.onchange('date_from')
+    def onchange_date_from(self):
+        if self.date_from and not self.date_range_id:
+            date = fields.Datetime.from_string(self.date_from)
+            res = self.company_id.compute_fiscalyear_dates(date)
+            self.fy_start_date = res['date_from']
 
     @api.onchange('company_id')
     def onchange_company_id(self):
