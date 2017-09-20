@@ -24,7 +24,8 @@ class TrialBalanceReportWizard(models.TransientModel):
     )
     date_from = fields.Date(required=True)
     date_to = fields.Date(required=True)
-    fy_start_date = fields.Date(required=True)
+    fy_start_date = fields.Date(
+        compute='compute_fy_start_date', readonly=True)
     target_move = fields.Selection([('posted', 'All Posted Entries'),
                                     ('all', 'All Entries')],
                                    string='Target Moves',
@@ -54,12 +55,13 @@ class TrialBalanceReportWizard(models.TransientModel):
         string='Not only one unaffected earnings account'
     )
 
-    @api.onchange('date_from')
-    def onchange_date_from(self):
-        if self.date_from:
-            date = fields.Datetime.from_string(self.date_from)
-            res = self.company_id.compute_fiscalyear_dates(date)
-            self.fy_start_date = res['date_from']
+    @api.depends('date_from')
+    def compute_fy_start_date(self):
+        for wiz in self:
+            if wiz.date_from:
+                date = fields.Datetime.from_string(wiz.date_from)
+                res = self.company_id.compute_fiscalyear_dates(date)
+                wiz.fy_start_date = res['date_from']
 
     @api.onchange('company_id')
     def onchange_company_id(self):
