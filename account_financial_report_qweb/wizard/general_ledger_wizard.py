@@ -62,7 +62,7 @@ class GeneralLedgerReportWizard(models.TransientModel):
 
     @api.onchange('date_from')
     def onchange_date_from(self):
-        if self.date_from and not self.date_range_id:
+        if self.date_from:
             date = fields.Datetime.from_string(self.date_from)
             res = self.company_id.compute_fiscalyear_dates(date)
             self.fy_start_date = res['date_from']
@@ -83,10 +83,6 @@ class GeneralLedgerReportWizard(models.TransientModel):
         """Handle date range change."""
         self.date_from = self.date_range_id.date_start
         self.date_to = self.date_range_id.date_end
-        if self.date_from:
-            self.fy_start_date = self.env.user.company_id.find_daterange_fy(
-                fields.Date.from_string(self.date_range_id.date_start)
-            ).date_start
 
     @api.onchange('receivable_accounts_only', 'payable_accounts_only')
     def onchange_type_accounts_only(self):
