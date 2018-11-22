@@ -24,14 +24,26 @@ class TrialBalanceReport(models.TransientModel):
     date_to = fields.Date()
     fy_start_date = fields.Date()
     only_posted_moves = fields.Boolean()
-    hide_account_balance_at_0 = fields.Boolean()
+    hide_account_at_0 = fields.Boolean()
     foreign_currency = fields.Boolean()
     company_id = fields.Many2one(comodel_name='res.company')
     filter_account_ids = fields.Many2many(comodel_name='account.account')
     filter_partner_ids = fields.Many2many(comodel_name='res.partner')
     filter_journal_ids = fields.Many2many(comodel_name='account.journal')
     show_partner_details = fields.Boolean()
-
+    hierarchy_on = fields.Selection(
+        [('computed', 'Computed Accounts'),
+         ('relation', 'Child Accounts'),
+         ('none', 'No hierarchy')],
+        string='Hierarchy On',
+        required=True,
+        default='computed',
+        help="""Computed Accounts: Use when the account group have codes
+        that represent prefixes of the actual accounts.\n
+        Child Accounts: Use when your account groups are hierarchical.\n
+        No hierarchy: Use to display just the accounts, without any grouping.
+        """,period_balance = fields.Float(digits=(16, 2))
+    )
     # General Ledger Report Data fields,
     # used as base for compute the data reports
     general_ledger_id = fields.Many2one(
@@ -75,6 +87,7 @@ class TrialBalanceReportAccount(models.TransientModel):
     initial_balance_foreign_currency = fields.Float(digits=(16, 2))
     debit = fields.Float(digits=(16, 2))
     credit = fields.Float(digits=(16, 2))
+    period_balance = fields.Float(digits=(16, 2))
     currency_id = fields.Many2one(comodel_name='res.currency')
     final_balance = fields.Float(digits=(16, 2))
     final_balance_foreign_currency = fields.Float(digits=(16, 2))
@@ -110,6 +123,7 @@ class TrialBalanceReportPartner(models.TransientModel):
     initial_balance_foreign_currency = fields.Float(digits=(16, 2))
     debit = fields.Float(digits=(16, 2))
     credit = fields.Float(digits=(16, 2))
+    period_balance = fields.Float(digits=(16, 2))
     currency_id = fields.Many2one(comodel_name='res.currency')
     final_balance = fields.Float(digits=(16, 2))
     final_balance_foreign_currency = fields.Float(digits=(16, 2))
@@ -169,7 +183,7 @@ class TrialBalanceReportCompute(models.TransientModel):
             'date_from': self.date_from,
             'date_to': self.date_to,
             'only_posted_moves': self.only_posted_moves,
-            'hide_account_balance_at_0': self.hide_account_balance_at_0,
+            'hide_account_at_0': self.hide_account_at_0,
             'foreign_currency': self.foreign_currency,
             'company_id': self.company_id.id,
             'filter_account_ids': [(6, 0, account_ids.ids)],
@@ -206,7 +220,7 @@ class TrialBalanceReportCompute(models.TransientModel):
 
     def _inject_account_values(self, account_ids):
         """Inject report values for report_trial_balance_qweb_account"""
-        query_inject_account = """
+        query_inject_account = """account_
 INSERT INTO
     report_trial_balance_qweb_account
     (
