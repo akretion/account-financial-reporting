@@ -1672,7 +1672,7 @@ WHERE
         # pylint: disable=sql-injection
         query_inject_account = """
             INSERT INTO
-                report_general_ledger_account (
+                report_general_ledger_qweb_account (
                 report_id,
                 create_uid,
                 create_date,

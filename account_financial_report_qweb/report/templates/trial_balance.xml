@@ -44,8 +44,8 @@
                             <t t-set="style" t-value="'font-size: ' + str(14 - line.level) + 'px; margin-left: ' + str(line.level * 4) + 'px;'"/>
                         </t>
                         <t t-if="line.account_group_id">
-                                <t t-set="style" t-value="style + 'font-weight: bold; color: blue;'"/>
-                            </t>
+                            <t t-set="style" t-value="style + 'font-weight: bold; color: blue;'"/>
+                        </t>
 
                         <!-- Display account lines -->
                         <t t-call="account_financial_report_qweb.report_trial_balance_qweb_line"/>

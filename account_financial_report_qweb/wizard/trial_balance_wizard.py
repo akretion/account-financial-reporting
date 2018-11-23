@@ -31,16 +31,30 @@ class TrialBalanceReportWizard(models.TransientModel):
                                    string='Target Moves',
                                    required=True,
                                    default='all')
+    hierarchy_on = fields.Selection(
+        [('computed', 'Computed Accounts'),
+         ('relation', 'Child Accounts'),
+         ('none', 'No hierarchy')],
+        string='Hierarchy On',
+        required=True,
+        default='computed',
+        help="""Computed Accounts: Use when the account group have codes
+        that represent prefixes of the actual accounts.\n
+        Child Accounts: Use when your account groups are hierarchical.\n
+        No hierarchy: Use to display just the accounts, without any grouping.
+        """,
+    )
+    limit_hierarchy_level = fields.Boolean('Limit hierarchy levels')
+    show_hierarchy_level = fields.Integer('Hierarchy Levels to display')
     account_ids = fields.Many2many(
         comodel_name='account.account',
         string='Filter accounts',
     )
-    hide_account_balance_at_0 = fields.Boolean(
-        string='Hide account ending balance at 0',
-        help='Use this filter to hide an account or a partner '
-             'with an ending balance at 0. '
-             'If partners are filtered, '
-             'debits and credits totals will not match the trial balance.'
+    hide_account_at_0 = fields.Boolean(
+        string='Hide accounts at 0', default=True,
+        help='When this option is enabled, the trial balance will '
+             'not display accounts that have initial balance = '
+             'debit = credit = end balance = 0',
     )
     receivable_accounts_only = fields.Boolean()
     payable_accounts_only = fields.Boolean()
@@ -171,13 +185,16 @@ class TrialBalanceReportWizard(models.TransientModel):
             'date_from': self.date_from,
             'date_to': self.date_to,
             'only_posted_moves': self.target_move == 'posted',
-            'hide_account_balance_at_0': self.hide_account_balance_at_0,
+            'hide_account_at_0': self.hide_account_at_0,
             'foreign_currency': self.foreign_currency,
             'company_id': self.company_id.id,
             'filter_account_ids': [(6, 0, self.account_ids.ids)],
             'filter_partner_ids': [(6, 0, self.partner_ids.ids)],
             'filter_journal_ids': [(6, 0, self.journal_ids.ids)],
             'fy_start_date': self.fy_start_date,
+            'hierarchy_on': self.hierarchy_on,
+            'limit_hierarchy_level': self.limit_hierarchy_level,
+            'show_hierarchy_level': self.show_hierarchy_level,
             'show_partner_details': self.show_partner_details,
         }
 

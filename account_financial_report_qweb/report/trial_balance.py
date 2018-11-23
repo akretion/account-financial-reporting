@@ -267,7 +267,7 @@ class TrialBalanceReportCompute(models.TransientModel):
 
     def _inject_account_values(self, account_ids):
         """Inject report values for report_trial_balance_qweb_account"""
-        query_inject_account = """account_
+        query_inject_account = """
 INSERT INTO
     report_trial_balance_qweb_account
     (
@@ -369,12 +369,11 @@ AND ra.report_id = %s
         )
         self.env.cr.execute(query_inject_partner, query_inject_partner_params)
 
-
     def _inject_account_group_values(self):
-        """Inject report values for report_trial_balance_account"""
+        """Inject report values for report_trial_balance_qweb_account"""
         query_inject_account_group = """
 INSERT INTO
-    report_trial_balance_account
+    report_trial_balance_qweb_account
     (
     report_id,
     create_uid,
@@ -406,22 +405,23 @@ FROM
                             query_inject_account_params)
 
     def _update_account_group_child_values(self):
-        """Compute values for report_trial_balance_account group in child."""
+        """Compute values for report_trial_balance_qweb_account group
+        in child."""
         query_update_account_group = """
 WITH computed AS (WITH RECURSIVE cte AS (
    SELECT account_group_id, code, account_group_id AS parent_id,
-    initial_balance, initial_balance_foreign_currency, debit, credit,
-    final_balance, final_balance_foreign_currency
-   FROM   report_trial_balance_account
+    initial_balance, initial_balance_foreign_currency, debit, credit, 
+    period_balance, final_balance, final_balance_foreign_currency
+   FROM   report_trial_balance_qweb_account
    WHERE report_id = %s
-   GROUP BY report_trial_balance_account.id
+   GROUP BY report_trial_balance_qweb_account.id
 
    UNION  ALL
    SELECT c.account_group_id, c.code, p.account_group_id,
     p.initial_balance, p.initial_balance_foreign_currency, p.debit, p.credit,
-    p.final_balance, p.final_balance_foreign_currency
+    p.period_balance, p.final_balance, p.final_balance_foreign_currency
    FROM   cte c
-   JOIN   report_trial_balance_account p USING (parent_id)
+   JOIN   report_trial_balance_qweb_account p USING (parent_id)
     WHERE p.report_id = %s
 )
 SELECT account_group_id, code,
@@ -429,31 +429,35 @@ SELECT account_group_id, code,
     sum(initial_balance_foreign_currency) AS initial_balance_foreign_currency,
     sum(debit) AS debit,
     sum(credit) AS credit,
+    sum(debit) - sum(credit) AS period_balance,
     sum(final_balance) AS final_balance,
     sum(final_balance_foreign_currency) AS final_balance_foreign_currency
 FROM   cte
 GROUP BY cte.account_group_id, cte.code
 ORDER BY account_group_id
 )
-UPDATE report_trial_balance_account
+UPDATE report_trial_balance_qweb_account
 SET initial_balance = computed.initial_balance,
     initial_balance_foreign_currency =
         computed.initial_balance_foreign_currency,
     debit = computed.debit,
     credit = computed.credit,
+    period_balance = computed.period_balance,
     final_balance = computed.final_balance,
     final_balance_foreign_currency =
         computed.final_balance_foreign_currency
 FROM computed
-WHERE report_trial_balance_account.account_group_id = computed.account_group_id
-    AND report_trial_balance_account.report_id = %s
+WHERE report_trial_balance_qweb_account.account_group_id = 
+computed.account_group_id
+    AND report_trial_balance_qweb_account.report_id = %s
 """
         query_update_account_params = (self.id, self.id, self.id,)
         self.env.cr.execute(query_update_account_group,
                             query_update_account_params)
 
     def _add_account_group_account_values(self):
-        """Compute values for report_trial_balance_account group in child."""
+        """Compute values for report_trial_balance_qweb_account group in
+        child."""
         query_update_account_group = """
 DROP AGGREGATE IF EXISTS array_concat_agg(anyarray);
 CREATE AGGREGATE array_concat_agg(anyarray) (
@@ -463,14 +467,14 @@ CREATE AGGREGATE array_concat_agg(anyarray) (
 WITH aggr AS(WITH computed AS (WITH RECURSIVE cte AS (
    SELECT account_group_id, account_group_id AS parent_id,
     ARRAY[account_id]::int[] as child_account_ids
-   FROM   report_trial_balance_account
+   FROM   report_trial_balance_qweb_account
    WHERE report_id = %s
-   GROUP BY report_trial_balance_account.id
+   GROUP BY report_trial_balance_qweb_account.id
 
    UNION  ALL
    SELECT c.account_group_id, p.account_group_id, ARRAY[p.account_id]::int[]
    FROM   cte c
-   JOIN   report_trial_balance_account p USING (parent_id)
+   JOIN   report_trial_balance_qweb_account p USING (parent_id)
     WHERE p.report_id = %s
 )
 SELECT account_group_id,
@@ -483,18 +487,20 @@ SELECT account_group_id,
     array_concat_agg(DISTINCT child_account_ids)::int[]
         AS child_account_ids from computed
 GROUP BY account_group_id)
-UPDATE report_trial_balance_account
+UPDATE report_trial_balance_qweb_account
 SET child_account_ids = aggr.child_account_ids
 FROM aggr
-WHERE report_trial_balance_account.account_group_id = aggr.account_group_id
-    AND report_trial_balance_account.report_id = %s
+WHERE report_trial_balance_qweb_account.account_group_id = 
+    aggr.account_group_id
+    AND report_trial_balance_qweb_account.report_id = %s
 """
         query_update_account_params = (self.id, self.id, self.id,)
         self.env.cr.execute(query_update_account_group,
                             query_update_account_params)
 
     def _update_account_group_computed_values(self):
-        """Compute values for report_trial_balance_account group in compute."""
+        """Compute values for report_trial_balance_qweb_account group
+        in compute."""
         query_update_account_group = """
 WITH RECURSIVE accgroup AS
 (SELECT
@@ -504,6 +510,7 @@ WITH RECURSIVE accgroup AS
         as initial_balance_foreign_currency,
     sum(coalesce(ra.debit, 0)) as debit,
     sum(coalesce(ra.credit, 0)) as credit,
+    sum(coalesce(ra.debit, 0)) - sum(coalesce(ra.credit, 0)) as period_balance,
     sum(coalesce(ra.final_balance, 0)) as final_balance,
     sum(coalesce(ra.final_balance_foreign_currency, 0))
         as final_balance_foreign_currency
@@ -511,39 +518,40 @@ WITH RECURSIVE accgroup AS
     account_group accgroup
     LEFT OUTER JOIN account_account AS acc
         ON strpos(acc.code, accgroup.code_prefix) = 1
-    LEFT OUTER JOIN report_trial_balance_account AS ra
+    LEFT OUTER JOIN report_trial_balance_qweb_account AS ra
         ON ra.account_id = acc.id
  WHERE ra.report_id = %s
  GROUP BY accgroup.id
 )
-UPDATE report_trial_balance_account
+UPDATE report_trial_balance_qweb_account
 SET initial_balance = accgroup.initial_balance,
     initial_balance_foreign_currency =
         accgroup.initial_balance_foreign_currency,
     debit = accgroup.debit,
     credit = accgroup.credit,
+    period_balance = accgroup.period_balance,
     final_balance = accgroup.final_balance,
     final_balance_foreign_currency =
         accgroup.final_balance_foreign_currency
-
 FROM accgroup
-WHERE report_trial_balance_account.account_group_id = accgroup.id
+WHERE report_trial_balance_qweb_account.account_group_id = accgroup.id
 """
         query_update_account_params = (self.id,)
         self.env.cr.execute(query_update_account_group,
                             query_update_account_params)
 
     def _update_account_sequence(self):
-        """Compute sequence, level for report_trial_balance_account account."""
+        """Compute sequence, level for report_trial_balance_qweb_
+        account account."""
         query_update_account_group = """
-UPDATE report_trial_balance_account
+UPDATE report_trial_balance_qweb_account
 SET sequence = newline.sequence + 1,
     level = newline.level + 1
-FROM report_trial_balance_account as newline
-WHERE newline.account_group_id = report_trial_balance_account.parent_id
-    AND report_trial_balance_account.report_id = newline.report_id
-    AND report_trial_balance_account.account_id is not null
-    AND report_trial_balance_account.report_id = %s"""
+FROM report_trial_balance_qweb_account as newline
+WHERE newline.account_group_id = report_trial_balance_qweb_account.parent_id
+    AND report_trial_balance_qweb_account.report_id = newline.report_id
+    AND report_trial_balance_qweb_account.account_id is not null
+    AND report_trial_balance_qweb_account.report_id = %s"""
         query_update_account_params = (self.id,)
         self.env.cr.execute(query_update_account_group,
                             query_update_account_params)
