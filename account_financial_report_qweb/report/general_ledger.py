@@ -29,7 +29,7 @@ class GeneralLedgerReport(models.TransientModel):
     date_to = fields.Date()
     fy_start_date = fields.Date()
     only_posted_moves = fields.Boolean()
-    hide_account_balance_at_0 = fields.Boolean()
+    hide_account_at_0 = fields.Boolean()
     foreign_currency = fields.Boolean()
     show_analytic_tags = fields.Boolean()
     company_id = fields.Many2one(comodel_name='res.company')
@@ -552,7 +552,7 @@ WHERE
         OR f.balance IS NOT NULL AND f.balance != 0
     )
         """
-        if self.hide_account_balance_at_0:
+        if self.hide_account_at_0:
             query_inject_account += """
 AND
     f.balance IS NOT NULL AND f.balance != 0
@@ -934,7 +934,7 @@ WHERE
         OR f.balance IS NOT NULL AND f.balance != 0
     )
         """
-        if self.hide_account_balance_at_0:
+        if self.hide_account_at_0:
             query_inject_partner += """
 AND
     f.balance IS NOT NULL AND f.balance != 0

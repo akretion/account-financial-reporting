@@ -145,10 +145,10 @@ class TrialBalanceReportWizard(models.TransientModel):
         """Handle partners change."""
         if self.show_partner_details:
             self.receivable_accounts_only = self.payable_accounts_only = True
-            self.hide_account_balance_at_0 = True
+            self.hide_account_at_0 = True
         else:
             self.receivable_accounts_only = self.payable_accounts_only = False
-            self.hide_account_balance_at_0 = False
+            self.hide_account_at_0 = False
 
     @api.multi
     def button_export_html(self):

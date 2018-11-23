@@ -32,7 +32,7 @@ class OpenItemsReportWizard(models.TransientModel):
         string='Filter accounts',
         domain=[('reconcile', '=', True)],
     )
-    hide_account_balance_at_0 = fields.Boolean(
+    hide_account_at_0 = fields.Boolean(
         string='Hide account ending balance at 0',
         help='Use this filter to hide an account or a partner '
              'with an ending balance at 0. '
@@ -122,7 +122,7 @@ class OpenItemsReportWizard(models.TransientModel):
         return {
             'date_at': self.date_at,
             'only_posted_moves': self.target_move == 'posted',
-            'hide_account_balance_at_0': self.hide_account_balance_at_0,
+            'hide_account_at_0': self.hide_account_at_0,
             'foreign_currency': self.foreign_currency,
             'company_id': self.company_id.id,
             'filter_account_ids': [(6, 0, self.account_ids.ids)],

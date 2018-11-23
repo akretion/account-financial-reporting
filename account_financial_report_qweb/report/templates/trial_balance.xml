@@ -435,17 +435,17 @@
                             <t t-att-style="style" t-raw="line.final_balance" t-options="{'widget': 'monetary', 'display_currency': res_company.currency_id}"/></a>
                         </span>
                     </t>
-                </t>
-                <t t-if="line.account_group_id">
-                    <t t-set="domain"
-                       t-value="[('account_id', 'in', line.compute_account_ids.ids)]"/>
-                    <span>
-                        <a t-att-data-domain="domain"
-                           t-att-data-res-model="'account.move.line'"
-                           class="o_account_financial_reports_web_action_monetary_multi"
-                           t-att-style="style">
-                        <t t-att-style="style" t-raw="line.final_balance" t-options="{'widget': 'monetary', 'display_currency': res_company.currency_id}"/></a>
-                    </span>
+                    <t t-if="line.account_group_id">
+                        <t t-set="domain"
+                           t-value="[('account_id', 'in', line.compute_account_ids.ids)]"/>
+                        <span>
+                            <a t-att-data-domain="domain"
+                               t-att-data-res-model="'account.move.line'"
+                               class="o_account_financial_reports_web_action_monetary_multi"
+                               t-att-style="style">
+                            <t t-att-style="style" t-raw="line.final_balance" t-options="{'widget': 'monetary', 'display_currency': res_company.currency_id}"/></a>
+                        </span>
+                        </t>
                 </t>
                 <t t-if="type == 'partner_type'">
                     <t t-set="domain"
@@ -470,15 +470,15 @@
                     <div class="act_as_cell amount">
                         <t t-if="type == 'account_type'">
                             <t t-if="line.account_id">
-                            <t t-set="domain"
-                               t-value="[('account_id', '=', line.account_id.id)]"/>
-                            <span>
-                                    <a t-att-data-domain="domain"
-                                       t-att-data-res-model="'account.move.line'"
-                                       class="o_account_financial_reports_web_action_monetary_multi"
-                                       t-att-style="style">
-                                    <t t-att-style="style" t-raw="line.initial_balance_foreign_currency" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/></a>
-                                </span>
+                                <t t-set="domain"
+                                   t-value="[('account_id', '=', line.account_id.id)]"/>
+                                <span>
+                                        <a t-att-data-domain="domain"
+                                           t-att-data-res-model="'account.move.line'"
+                                           class="o_account_financial_reports_web_action_monetary_multi"
+                                           t-att-style="style">
+                                        <t t-att-style="style" t-raw="line.initial_balance_foreign_currency" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/></a>
+                                    </span>
                             </t>
                             <t t-if="line.account_group_id">
                                 <t t-set="domain"
@@ -509,9 +509,9 @@
                     <div class="act_as_cell amount">
                         <t t-if="type == 'account_type'">
                             <t t-if="line.account_id">
-                            <t t-set="domain"
-                               t-value="[('account_id', '=', line.account_id.id)]"/>
-                            <span>
+                                <t t-set="domain"
+                                   t-value="[('account_id', '=', line.account_id.id)]"/>
+                                <span>
                                     <a t-att-data-domain="domain"
                                        t-att-data-res-model="'account.move.line'"
                                        class="o_account_financial_reports_web_action_monetary_multi"
@@ -519,17 +519,17 @@
                                     <t t-att-style="style" t-raw="line.final_balance_foreign_currency" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/></a>
                                 </span>
                             </t>
-                        </t>
-                        <t t-if="line.account_group_id">
-                            <t t-set="domain"
-                               t-value="[('account_id', 'in', line.compute_account_ids.ids)]"/>
-                            <span>
-                                <a t-att-data-domain="domain"
-                                   t-att-data-res-model="'account.move.line'"
-                                   class="o_account_financial_reports_web_action_monetary_multi"
-                                   t-att-style="style">
-                                <t t-att-style="style" t-raw="line.final_balance_foreign_currency" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/></a>
-                            </span>
+                            <t t-if="line.account_group_id">
+                                <t t-set="domain"
+                                   t-value="[('account_id', 'in', line.compute_account_ids.ids)]"/>
+                                <span>
+                                    <a t-att-data-domain="domain"
+                                       t-att-data-res-model="'account.move.line'"
+                                       class="o_account_financial_reports_web_action_monetary_multi"
+                                       t-att-style="style">
+                                    <t t-att-style="style" t-raw="line.final_balance_foreign_currency" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/></a>
+                                </span>
+                            </t>
                         </t>
                         <t t-if="type == 'partner_type'">
                             <t t-set="domain"

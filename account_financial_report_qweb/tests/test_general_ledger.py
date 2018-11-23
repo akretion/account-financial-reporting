@@ -42,14 +42,14 @@ class TestGeneralLedger(a_t_f_c.AbstractTestForeignCurrency):
     def _getAdditionalFiltersToBeTested(self):
         additional_filters = [
             {'only_posted_moves': True},
-            {'hide_account_balance_at_0': True},
+            {'hide_account_at_0': True},
             {'centralize': True},
-            {'only_posted_moves': True, 'hide_account_balance_at_0': True},
+            {'only_posted_moves': True, 'hide_account_at_0': True},
             {'only_posted_moves': True, 'centralize': True},
-            {'hide_account_balance_at_0': True, 'centralize': True},
+            {'hide_account_at_0': True, 'centralize': True},
             {
                 'only_posted_moves': True,
-                'hide_account_balance_at_0': True,
+                'hide_account_at_0': True,
                 'centralize': True
             },
         ]
@@ -155,7 +155,7 @@ class TestGeneralLedgerReport(common.TransactionCase):
             'date_from': self.fy_date_start,
             'date_to': self.fy_date_end,
             'only_posted_moves': True,
-            'hide_account_balance_at_0': False,
+            'hide_account_at_0': False,
             'company_id': company.id,
             'fy_start_date': self.fy_date_start,
             })
