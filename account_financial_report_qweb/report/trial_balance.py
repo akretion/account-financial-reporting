@@ -42,8 +42,10 @@ class TrialBalanceReport(models.TransientModel):
         that represent prefixes of the actual accounts.\n
         Child Accounts: Use when your account groups are hierarchical.\n
         No hierarchy: Use to display just the accounts, without any grouping.
-        """,period_balance = fields.Float(digits=(16, 2))
+        """, period_balance=fields.Float(digits=(16, 2))
     )
+    limit_hierarchy_level = fields.Boolean('Limit hierarchy levels')
+    show_hierarchy_level = fields.Integer('Hierarchy Levels to display')
     # General Ledger Report Data fields,
     # used as base for compute the data reports
     general_ledger_id = fields.Many2one(
@@ -61,14 +63,14 @@ class TrialBalanceReportAccount(models.TransientModel):
 
     _name = 'report_trial_balance_qweb_account'
     _inherit = 'report_qweb_abstract'
-    _order = 'code ASC'
+    _order = 'sequence, code ASC, name'
 
     report_id = fields.Many2one(
         comodel_name='report_trial_balance_qweb',
         ondelete='cascade',
         index=True
     )
-
+    hide_line = fields.Boolean(compute='_compute_hide_line')
     # Data fields, used to keep link with real object
     sequence = fields.Integer(index=True, default=0)
     level = fields.Integer(index=True, default=0)
@@ -78,6 +80,20 @@ class TrialBalanceReportAccount(models.TransientModel):
         'account.account',
         index=True
     )
+
+    account_group_id = fields.Many2one(
+        'account.group',
+        index=True
+    )
+    parent_id = fields.Many2one(
+        'account.group',
+        index=True
+    )
+    child_account_ids = fields.Char(
+        string="Accounts")
+    compute_account_ids = fields.Many2many(
+        'account.account',
+        string="Accounts", store=True)
 
     # Data fields, used for report display
     code = fields.Char()
@@ -97,6 +113,24 @@ class TrialBalanceReportAccount(models.TransientModel):
         comodel_name='report_trial_balance_qweb_partner',
         inverse_name='report_account_id'
     )
+
+    @api.multi
+    def _compute_hide_line(self):
+        for rec in self:
+            report = rec.report_id
+            rec.hide_line = False
+            if report.hide_account_at_0 and (
+                    not rec.initial_balance and
+                    not rec.final_balance and
+                    not rec.debit and
+                    not rec.credit):
+                rec.hide_line = True
+            elif report.limit_hierarchy_level and rec.account_id:
+                rec.hide_line = True
+            elif report.limit_hierarchy_level and \
+                    rec.account_group_id and \
+                    rec.level != report.show_hierarchy_level:
+                rec.hide_line = True
 
 
 class TrialBalanceReportPartner(models.TransientModel):
@@ -215,8 +249,21 @@ class TrialBalanceReportCompute(models.TransientModel):
         self._inject_account_values(account_ids)
         if self.show_partner_details:
             self._inject_partner_values()
-        # Refresh cache because all data are computed with SQL requests
-        self.invalidate_cache()
+        if not self.filter_account_ids:
+            if self.hierarchy_on != 'none':
+                self._inject_account_group_values()
+                if self.hierarchy_on == 'computed':
+                    self._update_account_group_computed_values()
+                else:
+                    self._update_account_group_child_values()
+                self._update_account_sequence()
+                self._add_account_group_account_values()
+        self.refresh()
+        if not self.filter_account_ids and self.hierarchy_on != 'none':
+            self._compute_group_accounts()
+        else:
+            for line in self.account_ids:
+                line.write({'level': 0})
 
     def _inject_account_values(self, account_ids):
         """Inject report values for report_trial_balance_qweb_account"""
@@ -228,6 +275,7 @@ INSERT INTO
     create_uid,
     create_date,
     account_id,
+    parent_id,
     code,
     name,
     initial_balance,
@@ -244,6 +292,7 @@ SELECT
     NOW() AS create_date,
     acc.id,
     acc.code,
+    acc.group_id,
     acc.name,
     coalesce(rag.initial_balance, 0) AS initial_balance,
     coalesce(rag.final_debit - rag.initial_debit, 0) AS debit,
