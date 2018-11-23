@@ -410,7 +410,7 @@ FROM
         query_update_account_group = """
 WITH computed AS (WITH RECURSIVE cte AS (
    SELECT account_group_id, code, account_group_id AS parent_id,
-    initial_balance, initial_balance_foreign_currency, debit, credit, 
+    initial_balance, initial_balance_foreign_currency, debit, credit,
     period_balance, final_balance, final_balance_foreign_currency
    FROM   report_trial_balance_qweb_account
    WHERE report_id = %s
@@ -447,7 +447,7 @@ SET initial_balance = computed.initial_balance,
     final_balance_foreign_currency =
         computed.final_balance_foreign_currency
 FROM computed
-WHERE report_trial_balance_qweb_account.account_group_id = 
+WHERE report_trial_balance_qweb_account.account_group_id =
 computed.account_group_id
     AND report_trial_balance_qweb_account.report_id = %s
 """
@@ -490,7 +490,7 @@ GROUP BY account_group_id)
 UPDATE report_trial_balance_qweb_account
 SET child_account_ids = aggr.child_account_ids
 FROM aggr
-WHERE report_trial_balance_qweb_account.account_group_id = 
+WHERE report_trial_balance_qweb_account.account_group_id =
     aggr.account_group_id
     AND report_trial_balance_qweb_account.report_id = %s
 """

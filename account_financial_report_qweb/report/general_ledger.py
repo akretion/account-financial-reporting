@@ -1610,7 +1610,7 @@ WITH move_lines_on_tags AS
 """
             query_select_previous_fy_unaffected_earnings += q_analytic_tags
 
-        query_select_previous_fy_unaffected_earnings += """    
+        query_select_previous_fy_unaffected_earnings += """
             SELECT  sum(ml.balance) as balance
             FROM account_move_line as ml
             INNER JOIN account_move as am
@@ -1628,7 +1628,7 @@ WITH move_lines_on_tags AS
                 'cost_center_ids'] = tuple(self.filter_cost_center_ids.ids)
         if self.filter_analytic_tag_ids:
             query_select_previous_fy_unaffected_earnings += """
-                INNER JOIN move_lines_on_tags ON ml.id = 
+                INNER JOIN move_lines_on_tags ON ml.id =
                 move_lines_on_tags.ml_id
             """
         query_select_previous_fy_unaffected_earnings += """
@@ -1684,7 +1684,7 @@ WITH move_lines_on_tags AS
                 'cost_center_ids'] = tuple(self.filter_cost_center_ids.ids)
         if self.filter_analytic_tag_ids:
             query_select_period_unaffected_earnings += """
-                INNER JOIN move_lines_on_tags 
+                INNER JOIN move_lines_on_tags
                 ON ml.id = move_lines_on_tags.ml_id
                 """
         query_select_period_unaffected_earnings += """
