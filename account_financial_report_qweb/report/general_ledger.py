@@ -1582,12 +1582,39 @@ WHERE
             'date_to': fy_start_date,
             'company_id': self.company_id.id,
             'account_ids': tuple(unaffected_earnings_account_ids),
+            'analytic_tag_ids': tuple(self.filter_analytic_tag_ids.ids),
         }
-        query_select_previous_fy_unaffected_earnings = """
-            SELECT  sum(aml.balance) as balance
-            FROM account_move_line as aml
+        query_select_previous_fy_unaffected_earnings = ''
+        q_analytic_tags = ''
+        if self.filter_analytic_tag_ids:
+            q_analytic_tags = """
+WITH move_lines_on_tags AS
+    (
+        SELECT
+            DISTINCT ml.id AS ml_id
+        FROM
+            account_account a
+        INNER JOIN
+            account_move_line ml
+                ON a.id = ml.account_id
+        INNER JOIN
+            account_analytic_tag_account_move_line_rel atml
+                ON atml.account_move_line_id = ml.id
+        INNER JOIN
+            account_analytic_tag aat
+                ON
+                    atml.account_analytic_tag_id = aat.id
+        WHERE
+            aat.id IN %(analytic_tag_ids)s
+    )
+"""
+            query_select_previous_fy_unaffected_earnings += q_analytic_tags
+
+        query_select_previous_fy_unaffected_earnings += """    
+            SELECT  sum(ml.balance) as balance
+            FROM account_move_line as ml
             INNER JOIN account_move as am
-            ON am.id = aml.move_id
+            ON am.id = ml.move_id
             INNER JOIN account_journal j
             ON am.journal_id = j.id
         """
@@ -1599,11 +1626,15 @@ WHERE
             """
             query_select_previous_fy_unaffected_earnings_params[
                 'cost_center_ids'] = tuple(self.filter_cost_center_ids.ids)
-
+        if self.filter_analytic_tag_ids:
+            query_select_previous_fy_unaffected_earnings += """
+                INNER JOIN move_lines_on_tags ON ml.id = 
+                move_lines_on_tags.ml_id
+            """
         query_select_previous_fy_unaffected_earnings += """
-            WHERE aml.date < %(date_to)s
-            AND aml.company_id = %(company_id)s
-            AND aml.account_id IN %(account_ids)s
+            WHERE ml.date < %(date_to)s
+            AND ml.company_id = %(company_id)s
+            AND ml.account_id IN %(account_ids)s
         """
         if self.filter_journal_ids:
             query_select_previous_fy_unaffected_earnings += """
@@ -1627,15 +1658,19 @@ WHERE
             'date_to': self.date_to,
             'company_id': self.company_id.id,
             'unaffected_earnings_id': self.unaffected_earnings_account.id,
+            'analytic_tag_ids': tuple(self.filter_analytic_tag_ids.ids),
         }
-        query_select_period_unaffected_earnings = """
+        query_select_period_unaffected_earnings = ''
+        if self.filter_analytic_tag_ids:
+            query_select_period_unaffected_earnings += q_analytic_tags
+        query_select_period_unaffected_earnings += """
             SELECT
-                sum(aml.debit) as sum_debit,
-                sum(aml.credit) as sum_credit,
-                sum(aml.balance) as balance
-                FROM account_move_line as aml
+                sum(ml.debit) as sum_debit,
+                sum(ml.credit) as sum_credit,
+                sum(ml.balance) as balance
+                FROM account_move_line as ml
                 INNER JOIN account_move as am
-                ON am.id = aml.move_id
+                ON am.id = ml.move_id
                 INNER JOIN account_journal j
                 ON am.journal_id = j.id
         """
@@ -1647,11 +1682,16 @@ WHERE
             """
             query_select_period_unaffected_earnings_params[
                 'cost_center_ids'] = tuple(self.filter_cost_center_ids.ids)
+        if self.filter_analytic_tag_ids:
+            query_select_period_unaffected_earnings += """
+                INNER JOIN move_lines_on_tags 
+                ON ml.id = move_lines_on_tags.ml_id
+                """
         query_select_period_unaffected_earnings += """
             WHERE am.date >= %(date_from)s
-            AND aml.date <= %(date_to)s
-            AND aml.company_id = %(company_id)s
-            AND aml.account_id = %(unaffected_earnings_id)s
+            AND ml.date <= %(date_to)s
+            AND ml.company_id = %(company_id)s
+            AND ml.account_id = %(unaffected_earnings_id)s
         """
         if self.filter_journal_ids:
             query_select_period_unaffected_earnings += """
