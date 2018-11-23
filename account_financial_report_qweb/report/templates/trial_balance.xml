@@ -27,7 +27,7 @@
 
             <!-- Display account lines -->
             <t t-if="not show_partner_details">
-                <div class="act_as_table data_table" style="width: 1325px !important;">
+                <div class="act_as_table data_table" style="width: 100%;">
                     <!-- Display account header -->
                     <t t-call="account_financial_report_qweb.report_trial_balance_qweb_lines_header"/>
 
@@ -43,8 +43,13 @@
                         <t t-if="not o.hide_account_at_0">
                             <t t-set="style" t-value="'font-size: ' + str(14 - line.level) + 'px; margin-left: ' + str(line.level * 4) + 'px;'"/>
                         </t>
+                        <t t-if="line.account_group_id">
+                                <t t-set="style" t-value="style + 'font-weight: bold; color: blue;'"/>
+                            </t>
+
                         <!-- Display account lines -->
                         <t t-call="account_financial_report_qweb.report_trial_balance_qweb_line"/>
+                        <!-- Adapt style -->
                     </t>
                 </div>
             </t>
@@ -98,7 +103,6 @@
             </t>
         </div>
     </template>
-
     <template id="account_financial_report_qweb.report_trial_balance_qweb_filters">
         <div class="act_as_table data_table" style="width: 100%;">
             <div class="act_as_row labels">
@@ -261,7 +265,6 @@
                             <t t-att-style="style" t-raw="line.initial_balance" t-options="{'widget': 'monetary', 'display_currency': res_company.currency_id}"/></a>
                         </span>
                     </t>
-                </t>
                 </t>
                 <t t-if="type == 'partner_type'">
                     <t t-set="domain"
@@ -433,6 +436,17 @@
                         </span>
                     </t>
                 </t>
+                <t t-if="line.account_group_id">
+                    <t t-set="domain"
+                       t-value="[('account_id', 'in', line.compute_account_ids.ids)]"/>
+                    <span>
+                        <a t-att-data-domain="domain"
+                           t-att-data-res-model="'account.move.line'"
+                           class="o_account_financial_reports_web_action_monetary_multi"
+                           t-att-style="style">
+                        <t t-att-style="style" t-raw="line.final_balance" t-options="{'widget': 'monetary', 'display_currency': res_company.currency_id}"/></a>
+                    </span>
+                </t>
                 <t t-if="type == 'partner_type'">
                     <t t-set="domain"
                        t-value="[('account_id', '=', line.report_account_id.account_id.id),
@@ -444,7 +458,7 @@
                            t-att-style="style">
                         <t t-att-style="style" t-raw="line.final_balance" t-options="{'widget': 'monetary', 'display_currency': res_company.currency_id}"/></a>
                     </span>
-                        </t>
+                </t>
             </div>
             <t t-if="foreign_currency">
                 <t t-if="account_or_partner_line.currency_id">
@@ -459,6 +473,17 @@
                             <t t-set="domain"
                                t-value="[('account_id', '=', line.account_id.id)]"/>
                             <span>
+                                    <a t-att-data-domain="domain"
+                                       t-att-data-res-model="'account.move.line'"
+                                       class="o_account_financial_reports_web_action_monetary_multi"
+                                       t-att-style="style">
+                                    <t t-att-style="style" t-raw="line.initial_balance_foreign_currency" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/></a>
+                                </span>
+                            </t>
+                            <t t-if="line.account_group_id">
+                                <t t-set="domain"
+                                   t-value="[('account_id', 'in', line.compute_account_ids.ids)]"/>
+                                <span>
                                     <a t-att-data-domain="domain"
                                        t-att-data-res-model="'account.move.line'"
                                        class="o_account_financial_reports_web_action_monetary_multi"
@@ -494,6 +519,17 @@
                                     <t t-att-style="style" t-raw="line.final_balance_foreign_currency" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/></a>
                                 </span>
                             </t>
+                        </t>
+                        <t t-if="line.account_group_id">
+                            <t t-set="domain"
+                               t-value="[('account_id', 'in', line.compute_account_ids.ids)]"/>
+                            <span>
+                                <a t-att-data-domain="domain"
+                                   t-att-data-res-model="'account.move.line'"
+                                   class="o_account_financial_reports_web_action_monetary_multi"
+                                   t-att-style="style">
+                                <t t-att-style="style" t-raw="line.final_balance_foreign_currency" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/></a>
+                            </span>
                         </t>
                         <t t-if="type == 'partner_type'">
                             <t t-set="domain"

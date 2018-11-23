@@ -35,7 +35,11 @@ class TrialBalanceXslx(abstract_report_xlsx.AbstractReportXslx):
                     'field': 'credit',
                     'type': 'amount',
                     'width': 14},
-                5: {'header': _('Ending balance'),
+                5: {'header': _('Period balance'),
+                    'field': 'period_balance',
+                    'type': 'amount',
+                    'width': 14},
+                6: {'header': _('Ending balance'),
                     'field': 'final_balance',
                     'type': 'amount',
                     'width': 14},
@@ -72,7 +76,11 @@ class TrialBalanceXslx(abstract_report_xlsx.AbstractReportXslx):
                     'field': 'credit',
                     'type': 'amount',
                     'width': 14},
-                4: {'header': _('Ending balance'),
+                4: {'header': _('Period balance'),
+                    'field': 'period_balance',
+                    'type': 'amount',
+                    'width': 14},
+                5: {'header': _('Ending balance'),
                     'field': 'final_balance',
                     'type': 'amount',
                     'width': 14},
@@ -106,6 +114,9 @@ class TrialBalanceXslx(abstract_report_xlsx.AbstractReportXslx):
                 _('Hide') if report.hide_account_balance_at_0 else _('Show')],
             [_('Show foreign currency'),
              _('Yes') if report.foreign_currency else _('No')],
+            [_('Limit hierarchy levels'),
+             _('Level %s' % report.show_hierarchy_level) if
+             report.limit_hierarchy_level else _('No limit')],
         ]
 
     def _get_col_count_filter_name(self):
