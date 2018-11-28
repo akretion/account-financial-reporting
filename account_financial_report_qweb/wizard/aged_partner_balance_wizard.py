@@ -21,7 +21,7 @@ class AgedPartnerBalance(models.TransientModel):
         string='Company'
     )
     date_at = fields.Date(required=True,
-                          default=fields.Date.to_string(datetime.today()))
+                          default=fields.Date.context_today)
     target_move = fields.Selection([('posted', 'All Posted Entries'),
                                     ('all', 'All Entries')],
                                    string='Target Moves',
