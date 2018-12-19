@@ -17,7 +17,7 @@
         <t t-set="show_cost_center" t-value="o.show_cost_center"/>
         <t t-set="foreign_currency" t-value="o.foreign_currency"/>
         <!-- Defines global variables used by internal layout -->
-        <t t-set="title">General Ledger</t>
+        <t t-set="title">General Ledger - <t t-raw="o.company_id.name"/> - <t t-raw="o.company_id.currency_id.name"/></t>
         <t t-set="company_name" t-value="o.company_id.name"/>
 
         <div class="page">

@@ -16,7 +16,7 @@
         <t t-set="show_partner_details" t-value="o.show_partner_details"/>
         <t t-set="foreign_currency" t-value="o.foreign_currency"/>
             <!-- Defines global variables used by internal layout -->
-            <t t-set="title">Trial Balance</t>
+            <t t-set="title">Trial Balance - <t t-raw="o.company_id.name"/> - <t t-raw="o.company_id.currency_id.name"/></t>
             <t t-set="company_name" t-value="o.company_id.name"/>
             <t t-set="res_company" t-value="o.company_id"/>
 

@@ -12,7 +12,7 @@
     </template>
 
     <template id="report_journal_ledger_base">
-        <t t-set="title">Journal Ledger</t>
+        <t t-set="title">Journal Ledger - <t t-raw="o.company_id.name"/> - <t t-raw="o.company_id.currency_id.name"/></t>
         <t t-set="company_name" t-value="o.company_id.name"/>
         <t t-set="display_currency" t-value="o.foreign_currency"/>
         <t t-set="display_account_name" t-value="o.with_account_name"/>

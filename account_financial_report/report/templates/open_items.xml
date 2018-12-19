@@ -17,7 +17,7 @@
 
 
         <!-- Defines global variables used by internal layout -->
-        <t t-set="title">Open Items</t>
+        <t t-set="title">Open Items - <t t-raw="o.company_id.name"/> - <t t-raw="o.company_id.currency_id.name"/></t>
         <t t-set="company_name" t-value="o.company_id.name"/>
 
         <div class="page">
