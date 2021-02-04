@@ -3,10 +3,12 @@
 # Copyright 2018 Jacques-Etienne Baudoux (BCIM sprl) <je@bcim.be>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-# from datetime import datetime
+from datetime import datetime
 from openerp.addons.report_xlsx.report.report_xlsx import ReportXlsx
 from openerp.addons.account_financial_report_webkit.report.general_ledger \
     import GeneralLedgerWebkit
+from openerp.addons.account_financial_report_webkit.report.partners_ledger \
+    import PartnersLedgerWebkit
 from openerp.tools.translate import _
 
 
@@ -272,3 +274,279 @@ class GeneralLedgerXlsx(ReportXlsx, report_xlsx_format):
 GeneralLedgerXlsx('report.account.account_report_general_ledger_xlsx',
                   'account.account',
                   parser=GeneralLedgerWebkit)
+
+
+class PartnersLedgerXlsx(ReportXlsx, report_xlsx_format):
+    column_sizes = [
+        10,  # date
+        8,  # period
+        25,  # move
+        8,  # journal,
+        30,  # partner
+        45,  # label
+        10,  # reconcile
+        12,  # debit
+        12,  # credit
+        20,  # cumul_bal
+    ]
+
+    def generate_xlsx_report(self, wb, data, objects):
+        _p = AttrDict(self.parser_instance.localcontext)
+
+        wb.formats[0].set_font_size(9)
+        ws = wb.add_worksheet(_p.report_name.upper()[:31])
+        ws.set_default_row(13)
+        ws.panes_frozen = True
+        ws.remove_splits = True
+        ws.portrait = 0  # Landscape
+        ws.fit_width_to_pages = 1
+        row_pos = 0
+
+        # set print header/footer
+        # ws.header_str = self.xls_headers['standard']
+        # ws.footer_str = self.xls_footers['standard']
+
+        # cf. account_report_general_ledger.mako
+        initial_balance_text = {'initial_balance': _('Computed'),
+                                'opening_balance': _('Opening Entries'),
+                                False: _('No')}
+
+        # Title
+        row_pos = 0
+        style_title = self._get_style(wb, 'xls_title')
+        report_name = ' - '.join([_p.report_name.upper(),
+                                 _p.company.partner_id.name,
+                                 _p.company.currency_id.name])
+        ws.write(row_pos, 0, report_name, style_title)
+
+        for i, size in enumerate(self.column_sizes):
+            ws.set_column(i, i, size)
+        row_pos += 2
+
+        # Header Table
+        style_header1 = self._get_style(wb, ('bold', 'fill_green', 'center'))
+        style_header2 = self._get_style(wb, ('center'))
+
+        ws.merge_range(
+            row_pos, 0, row_pos, 1, _('Chart of Account'), style_header1)
+        ws.merge_range(
+            row_pos+1, 0, row_pos+1, 1, _p.chart_account.name, style_header2)
+
+        ws.write(row_pos, 2, _('Fiscal Year'), style_header1)
+        ws.write(row_pos+1, 2, _p.fiscalyear.name if _p.fiscalyear else '-',
+                 style_header2)
+
+        df = _('From') + ': %s ' + _('To') + ': %s'
+        if _p.filter_form(data) == 'filter_date':
+            dfh = _('Dates Filter')
+            df = df % (_p.start_date or '', _p.stop_date or '')
+        else:
+            dfh = _('Periods Filter')
+            df = df % (_p.start_period and _p.start_period.name or '',
+                       _p.stop_period and _p.stop_period.name or '')
+        ws.merge_range(row_pos, 3, row_pos, 5, dfh, style_header1)
+        ws.merge_range(row_pos+1, 3, row_pos+1, 5, df, style_header2)
+
+        ws.write(row_pos, 6, _(u'Filtre écritures ciblées'), style_header1)
+        ws.write(row_pos+1, 6, _p.display_target_move(data), style_header2)
+        row_pos += 2
+
+        ws.freeze_panes(row_pos, 0)
+        row_pos += 1
+
+        # cell styles for ledger lines
+        style_account = self._get_style(wb, ('bold'))
+        style_labels = self._get_style(wb, ('fill_yellow'))
+        style_labels_r = self._get_style(wb, ('fill_yellow', 'right', 'bold'))
+        style_initial_balance = self._get_style(wb, ('italic', 'money'))
+        # style_date = self._get_style(wb, ('date'))
+        style_lines = self._get_style(wb, ('money'))
+        style_sums = self._get_style(wb, ('fill_yellow', 'money', 'bold'))
+        cnt = 0
+        for account in _p.objects:
+            if _p['ledger_lines'].get(account.id, False) or \
+                    _p['init_balance'].get(account.id, False):
+                if not _p['partners_order'].get(account.id, False):
+                    continue
+                cnt += 1
+                account_total_debit = 0.0
+                account_total_credit = 0.0
+                account_balance_cumul = 0.0
+                account_balance_cumul_curr = 0.0
+
+                # Write account
+                name = ' - '.join([account.code, account.name])
+                ws.write(row_pos, 0, name, style_account)
+                row_pos += 2
+                for partner_name, p_id, p_ref, p_name in \
+                        _p['partners_order'][account.id]:
+
+                    total_debit = 0.0
+                    total_credit = 0.0
+                    cumul_balance = 0.0
+                    cumul_balance_curr = 0.0
+                    part_cumul_balance = 0.0
+                    part_cumul_balance_curr = 0.0
+                    ws.write(row_pos, 0, partner_name, style_account)
+                    row_pos += 1
+
+                    # Write labels
+                    ws.write_row(row_pos, 0, [
+                        _(u'Date'), _(u'Période'), _(u'Ecriture'), _(u'Journal'), _(u'Partenaire'),
+                        _(u'Libellé'), _(u'Lettrage'), _(u'Débit'), _(u'Crédit'), _(u'Bal Cumulée')],
+                        style_labels_r)
+                    row_pos += 1
+
+                    row_start_partner = row_pos
+
+                    total_debit = _p['init_balance'][account.id].get(
+                        p_id, {}).get('debit') or 0.0
+                    total_credit = _p['init_balance'][account.id].get(
+                        p_id, {}).get('credit') or 0.0
+
+                    init_line = False
+                    if _p.initial_balance_mode and \
+                            (total_debit or total_credit):
+                        init_line = True
+                        part_cumul_balance = \
+                            _p['init_balance'][account.id].get(
+                                p_id, {}).get('init_balance') or 0.0
+                        part_cumul_balance_curr = \
+                            _p['init_balance'][account.id].get(
+                                p_id, {}).get('init_balance_currency') or 0.0
+                        balance_forward_currency = \
+                            _p['init_balance'][account.id].get(
+                                p_id, {}).get('currency_name') or ''
+
+                        cumul_balance += part_cumul_balance
+                        cumul_balance_curr += part_cumul_balance_curr
+                        row = [
+                            u"Balance Initiale",
+                            u"",
+                            total_debit,
+                            total_credit,
+                            "=%s-%s" % (cell(row_pos, 7), cell(row_pos, 8))
+                        ]
+                        if _p.amount_currency(data):
+                            row += [
+                                part_cumul_balance_curr,
+                                balance_forward_currency,
+                            ]
+                        ws.write_row(row_pos, 5, row, style_initial_balance)
+                        row_pos += 1
+
+                    for line in _p['ledger_lines'][account.id].get(p_id, []):
+                        row = []
+
+                        total_debit += line.get('debit') or 0.0
+                        total_credit += line.get('credit') or 0.0
+
+                        label_elements = [line.get('lname') or '']
+                        if line.get('invoice_number'):
+                            label_elements.append(
+                                "(%s)" % (line['invoice_number'],))
+                        label = ' '.join(label_elements)
+                        cumul_balance += line.get('balance') or 0.0
+                        if init_line or row_pos > row_start_partner:
+                            cumbal_formula = "=%s+" % cell(row_pos-1, 9)
+                        else:
+                            cumbal_formula = '='
+                        cumbal_formula += "%s-%s" % (cell(row_pos, 7), cell(row_pos, 8))
+
+                        if line.get('ldate'):
+                            row = [
+                                line['ldate'],
+                            ]
+                        else:
+                            row = []
+
+                        row += [
+                            line.get('period_code'),
+                            line.get('move_name'),
+                            line.get('jcode'),
+                            line.get('partner_name'),
+                            label,
+                            line.get('rec_name'),
+                            line.get('debit'),
+                            line.get('credit'),
+                            cumbal_formula
+                        ]
+                        if _p.amount_currency(data):
+                            row += [
+                                line.get('amount_currency'),
+                                line.get('currency_code'),
+                            ]
+                        ws.write_row(row_pos, 0, row, style_lines)
+                        row_pos += 1
+                        
+                    # end for line
+                    # Print row Cumulated Balance by partner #
+                    debit_partner_start = cell(row_start_partner, 7)
+                    debit_partner_end = cell(row_pos - 1, 7)
+                    debit_partner_total = "=SUM(%s:%s)" % (debit_partner_start, debit_partner_end)
+
+                    credit_partner_start = cell(row_start_partner, 8)
+                    credit_partner_end = cell(row_pos - 1, 8)
+                    credit_partner_total = "=SUM(%s:%s)" % (credit_partner_start, credit_partner_end)
+
+                    bal_partner_debit = cell(row_pos, 7)
+                    bal_partner_credit = cell(row_pos, 8)
+                    bal_partner_total = "=%s-%s" % (bal_partner_debit, bal_partner_credit)
+                    row = [
+                        u"Balance cumulée partenaire",
+                        u"",
+                        debit_partner_total,
+                        credit_partner_total,
+                        bal_partner_total
+                    ]
+                    if _p.amount_currency(data):
+                        if account.currency_id:
+                            row += [
+                                cumul_balance_curr or 0.0
+                            ]
+                        else:
+                            row += [
+                                ""
+                            ]
+                        row += [
+                            account.currency_id.name if account.currency_id else u""
+                        ]
+                    ws.write_row(row_pos, 5, row, style_labels_r)
+                    row_pos += 2
+                    account_total_debit += total_debit
+                    account_total_credit += total_credit
+                    account_balance_cumul += cumul_balance
+                    account_balance_cumul_curr += cumul_balance_curr
+
+                #  Print row Cumulated Balance by account #
+                row = [
+                    ' - '.join([account.code, account.name]),
+                    "",
+                    "",
+                    "",
+                    "",
+                    u"Balance cumulée sur le compte",
+                    u"",
+                    account_total_debit,
+                    account_total_credit,
+                    account_balance_cumul,
+                ]
+                if _p.amount_currency(data):
+                    if account.currency_id:
+                        row += [
+                            account_balance_cumul_curr or 0.0
+                        ]
+                    else:
+                        row += [
+                            ""
+                        ]
+                    row += [
+                        account.currency_id.name if account.currency_id else u""
+                    ]
+                ws.write_row(row_pos, 0, row, style_account)
+                row_pos += 2
+
+
+PartnersLedgerXlsx('report.account.account_report_partner_ledger_xlsx',
+                  'account.account',
+                  parser=PartnersLedgerWebkit)
