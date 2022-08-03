@@ -8,13 +8,16 @@
         <field name="arch" type="xml">
             <tree create="false" edit="false" delete="false">
                 <field name="company_id" groups="base.group_multi_company" />
-                <field name="line_type" />
+		<field name="line_type" />
+                <field name="full_reconcile_id" />
                 <field name="date" />
-                <field name="name" />
+		<field name="name" />
+                <field name="ref" />
                 <field name="partner_id" />
                 <field name="account_id" />
                 <field name="debit" sum="Total" />
-                <field name="credit" sum="Total" />
+		<field name="credit" sum="Total" />
+		<field name="amount_residual_extended" sum="Total" />
                 <button
                     type="object"
                     string="Open Journal Item / Forecast Line"
@@ -38,8 +41,8 @@
                         <field name="move_line_id" />
                     </group>
                     <group>
-                        <field name="debit" sum="Total" />
-                        <field name="credit" sum="Total" />
+                        <field name="debit" />
+			<field name="credit" />
                         <field name="company_id" groups="base.group_multi_company" />
                         <field name="line_type" />
                     </group>
@@ -64,7 +67,15 @@
                     domain="[('full_reconcile_id', '=', False), ('account_id.reconcile','=',True)]"
                     help="Journal items where matching number isn't set"
                     name="unreconciled"
+		/>
+                <separator />
+                <filter
+                    string="Unreconciled2"
+		    domain="['|', ('debit', '>', 0), ('credit', '>', 0)]"
+                    help="Journal items where matching number isn't set"
+                    name="unreconciled2"
                 />
+ 
                 <separator />
                 <filter
                     string="Journal Item"

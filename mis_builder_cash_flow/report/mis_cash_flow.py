@@ -19,11 +19,20 @@ class MisCashFlow(models.Model):
     name = fields.Char(
         readonly=True,
     )
+    ref = fields.Char(
+        readonly=True,
+    )
     account_id = fields.Many2one(
         comodel_name="account.account",
         string="Account",
         auto_join=True,
         index=True,
+        readonly=True,
+    )
+    journal_id = fields.Many2one(
+        comodel_name="account.journal",
+        string="Journal",
+        auto_join=True,
         readonly=True,
     )
     partner_id = fields.Many2one(
@@ -50,6 +59,9 @@ class MisCashFlow(models.Model):
     debit = fields.Float(
         readonly=True,
     )
+    amount_residual_extended = fields.Float(
+        readonly=True,
+    )
     date = fields.Date(
         readonly=True,
         index=True,
@@ -60,6 +72,7 @@ class MisCashFlow(models.Model):
     full_reconcile_id = fields.Many2one(
         "account.full.reconcile",
         string="Matching Number",
+        auto_join=True,
         readonly=True,
         index=True,
     )
@@ -94,14 +107,18 @@ class MisCashFlow(models.Model):
                     THEN -aml.amount_residual
                     ELSE 0.0
                 END AS credit,
+                am.amount_residual_extended as amount_residual_extended,
                 aml.reconciled as reconciled,
                 aml.full_reconcile_id as full_reconcile_id,
+                aml.journal_id as journal_id,
                 aml.partner_id as partner_id,
                 aml.company_id as company_id,
                 aml.name as name,
+                aml.ref as ref,
                 aml.parent_state as state,
                 COALESCE(aml.date_maturity, aml.date) as date
             FROM account_move_line as aml
+            JOIN account_move as am ON aml.move_id = am.id
             WHERE aml.parent_state != 'cancel'
             UNION ALL
             SELECT
@@ -119,11 +136,14 @@ class MisCashFlow(models.Model):
                     THEN -fl.balance
                     ELSE 0.0
                 END AS credit,
+                NULL as amount_residual_extended,
                 NULL as reconciled,
                 NULL as full_reconcile_id,
+                NULL as journal_id,
                 fl.partner_id as partner_id,
                 fl.company_id as company_id,
                 fl.name as name,
+                NULL as ref,
                 'posted' as state,
                 fl.date as date
             FROM mis_cash_flow_forecast_line as fl
