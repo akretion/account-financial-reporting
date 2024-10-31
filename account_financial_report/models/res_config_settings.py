@@ -1,14 +1,38 @@
 # Copyright 2023 Tecnativa - Carolina Fernandez
 # License LGPL-3.0 or later (http://www.gnu.org/licenses/lgpl.html).
 
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class ResConfigSettings(models.TransientModel):
     _inherit = "res.config.settings"
 
-    default_age_partner_config_id = fields.Many2one(
+    age_partner_config_id = fields.Many2one(
         "account.age.report.configuration",
         string="Intervals configuration",
-        default_model="aged.partner.balance.report.wizard",
     )
+
+    def set_values(self):
+        company = self.env.company
+        self.env["ir.default"].sudo().set(
+            "aged.partner.balance.report.wizard",
+            "age_partner_config_id",
+            self.age_partner_config_id.id,
+            company_id=company.id,
+        )
+        return super().set_values()
+
+    @api.model
+    def get_values(self):
+        res = super(ResConfigSettings, self).get_values()
+        company = self.env.company
+        res.update(
+            age_partner_config_id=self.env["ir.default"]
+            .sudo()
+            .get(
+                "aged.partner.balance.report.wizard",
+                "age_partner_config_id",
+                company_id=company.id,
+            )
+        )
+        return res
